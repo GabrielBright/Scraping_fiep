@@ -34,6 +34,7 @@ async def run():
         print("Aguardando carregamento de Marcas...")
         await page.wait_for_selector('//*[@id="selectMarcacarro_chosen"]/a')
         await page.click('//*[@id="selectMarcacarro_chosen"]/a')
+        await page.wait_for_selector('//*[@id="selectMarcacarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
         marcas = await page.query_selector_all('//*[@id="selectMarcacarro_chosen"]/div[@class="chosen-drop"]/ul/li')
 
         # Loop de marcas com barra de progresso
@@ -41,33 +42,41 @@ async def run():
             try:
                 nome_marca = await marcas[marca_index].text_content()
                 print(f"\n--> Marca [{marca_index}]: {nome_marca.strip()}")
+
                 await page.click('//*[@id="selectMarcacarro_chosen"]/a')
+                await page.wait_for_selector('//*[@id="selectMarcacarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
                 await page.click(f'//*[@id="selectMarcacarro_chosen"]/div[@class="chosen-drop"]/ul/li[{marca_index+1}]')
 
                 # Aguarda carregar modelos
                 print("    Aguardando carregamento de Modelos...")
                 await page.wait_for_selector('//*[@id="selectAnoModelocarro_chosen"]/a')
                 await page.click('//*[@id="selectAnoModelocarro_chosen"]/a')
+                await page.wait_for_selector('//*[@id="selectAnoModelocarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
                 modelos = await page.query_selector_all('//*[@id="selectAnoModelocarro_chosen"]/div[@class="chosen-drop"]/ul/li')
 
                 for modelo_index in range(1, min(2, len(modelos))):
                     try:
                         nome_modelo = await modelos[modelo_index].text_content()
                         print(f"    --> Modelo [{modelo_index}]: {nome_modelo.strip()}")
+
                         await page.click('//*[@id="selectAnoModelocarro_chosen"]/a')
+                        await page.wait_for_selector('//*[@id="selectAnoModelocarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
                         await page.click(f'//*[@id="selectAnoModelocarro_chosen"]/div[@class="chosen-drop"]/ul/li[{modelo_index+1}]')
 
                         # Aguarda carregar anos
                         print("        Aguardando carregamento de Anos...")
                         await page.wait_for_selector('//*[@id="selectAnocarro_chosen"]/a')
                         await page.click('//*[@id="selectAnocarro_chosen"]/a')
+                        await page.wait_for_selector('//*[@id="selectAnocarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
                         anos = await page.query_selector_all('//*[@id="selectAnocarro_chosen"]/div[@class="chosen-drop"]/ul/li')
 
                         for ano_index in range(1, min(2, len(anos))):
                             try:
                                 nome_ano = await anos[ano_index].text_content()
                                 print(f"        --> Ano [{ano_index}]: {nome_ano.strip()}")
+
                                 await page.click('//*[@id="selectAnocarro_chosen"]/a')
+                                await page.wait_for_selector('//*[@id="selectAnocarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
                                 await page.click(f'//*[@id="selectAnocarro_chosen"]/div[@class="chosen-drop"]/ul/li[{ano_index+1}]')
 
                                 # Scroll até o botão e clica
