@@ -17,8 +17,18 @@ async def abrir_dropdown_e_esperar(page, container_id):
     logging.info(f"Abrindo dropdown: {container_id}")
     await page.focus(f'div.chosen-container#{container_id} > a')
     await page.click(f'div.chosen-container#{container_id} > a')
-    await asyncio.sleep(1)
+    await asyncio.sleep(0.5)
+
+    # Ativa o campo de input se existir (existe no de Marca!)
+    try:
+        await page.fill(f'div.chosen-container#{container_id} input.chosen-search-input', '')
+        await asyncio.sleep(0.5)
+    except Exception:
+        pass  # Se não tiver input, segue normal (ex: dropdown de Anos não tem input)
+
+    # Espera o dropdown abrir de fato
     await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=15000)
+
 
 async def clicar_dropdown_item(page, container_id, index):
     """Clica no item do dropdown com hover + click (safe)."""
