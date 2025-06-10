@@ -3,10 +3,8 @@ import os
 import asyncio
 import sys
 import logging
-import re
 from tqdm import tqdm
 from playwright.async_api import async_playwright
-from time import time
 
 sys.stdout.reconfigure(encoding='utf-8')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,6 +22,10 @@ async def run():
         await page.wait_for_selector('//*[@id="front"]/div[1]/div[2]/ul/li[1]', timeout=60000)
         await page.click('//*[@id="front"]/div[1]/div[2]/ul/li[1]')
 
+        # Espera o formulário carregar
+        print("Esperando formulário carregar...")
+        await page.wait_for_selector('//form[@class="form"]', timeout=10000)
+
         # Seleciona tabela de referência mais recente
         print("Selecionando Tabela de Referência...")
         await page.wait_for_selector('//*[@id="selectTabelaReferencial_chosen"]/a', timeout=60000)
@@ -34,8 +36,8 @@ async def run():
         print("Aguardando carregamento de Marcas...")
         await page.wait_for_selector('//*[@id="selectMarcacarro_chosen"]/a')
         await page.click('//*[@id="selectMarcacarro_chosen"]/a')
-        await page.wait_for_selector('//*[@id="selectMarcacarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
-        marcas = await page.query_selector_all('//*[@id="selectMarcacarro_chosen"]/div[@class="chosen-drop"]/ul/li')
+        await page.wait_for_selector('//*[@id="selectMarcacarro_chosen"]//li[contains(@class, "active-result")]', timeout=10000)
+        marcas = await page.query_selector_all('//*[@id="selectMarcacarro_chosen"]//li[contains(@class, "active-result")]')
 
         # Loop de marcas com barra de progresso
         for marca_index in tqdm(range(1, min(3, len(marcas))), desc="Marcas"):
@@ -44,15 +46,16 @@ async def run():
                 print(f"\n--> Marca [{marca_index}]: {nome_marca.strip()}")
 
                 await page.click('//*[@id="selectMarcacarro_chosen"]/a')
-                await page.wait_for_selector('//*[@id="selectMarcacarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
-                await page.click(f'//*[@id="selectMarcacarro_chosen"]/div[@class="chosen-drop"]/ul/li[{marca_index+1}]')
+                await page.wait_for_selector('//*[@id="selectMarcacarro_chosen"]//li[contains(@class, "active-result")]', timeout=10000)
+                marcas = await page.query_selector_all('//*[@id="selectMarcacarro_chosen"]//li[contains(@class, "active-result")]')
+                await marcas[marca_index].click()
 
                 # Aguarda carregar modelos
                 print("    Aguardando carregamento de Modelos...")
                 await page.wait_for_selector('//*[@id="selectAnoModelocarro_chosen"]/a')
                 await page.click('//*[@id="selectAnoModelocarro_chosen"]/a')
-                await page.wait_for_selector('//*[@id="selectAnoModelocarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
-                modelos = await page.query_selector_all('//*[@id="selectAnoModelocarro_chosen"]/div[@class="chosen-drop"]/ul/li')
+                await page.wait_for_selector('//*[@id="selectAnoModelocarro_chosen"]//li[contains(@class, "active-result")]', timeout=10000)
+                modelos = await page.query_selector_all('//*[@id="selectAnoModelocarro_chosen"]//li[contains(@class, "active-result")]')
 
                 for modelo_index in range(1, min(2, len(modelos))):
                     try:
@@ -60,15 +63,16 @@ async def run():
                         print(f"    --> Modelo [{modelo_index}]: {nome_modelo.strip()}")
 
                         await page.click('//*[@id="selectAnoModelocarro_chosen"]/a')
-                        await page.wait_for_selector('//*[@id="selectAnoModelocarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
-                        await page.click(f'//*[@id="selectAnoModelocarro_chosen"]/div[@class="chosen-drop"]/ul/li[{modelo_index+1}]')
+                        await page.wait_for_selector('//*[@id="selectAnoModelocarro_chosen"]//li[contains(@class, "active-result")]', timeout=10000)
+                        modelos = await page.query_selector_all('//*[@id="selectAnoModelocarro_chosen"]//li[contains(@class, "active-result")]')
+                        await modelos[modelo_index].click()
 
                         # Aguarda carregar anos
                         print("        Aguardando carregamento de Anos...")
                         await page.wait_for_selector('//*[@id="selectAnocarro_chosen"]/a')
                         await page.click('//*[@id="selectAnocarro_chosen"]/a')
-                        await page.wait_for_selector('//*[@id="selectAnocarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
-                        anos = await page.query_selector_all('//*[@id="selectAnocarro_chosen"]/div[@class="chosen-drop"]/ul/li')
+                        await page.wait_for_selector('//*[@id="selectAnocarro_chosen"]//li[contains(@class, "active-result")]', timeout=10000)
+                        anos = await page.query_selector_all('//*[@id="selectAnocarro_chosen"]//li[contains(@class, "active-result")]')
 
                         for ano_index in range(1, min(2, len(anos))):
                             try:
@@ -76,8 +80,9 @@ async def run():
                                 print(f"        --> Ano [{ano_index}]: {nome_ano.strip()}")
 
                                 await page.click('//*[@id="selectAnocarro_chosen"]/a')
-                                await page.wait_for_selector('//*[@id="selectAnocarro_chosen"]/div[@class="chosen-drop"]/ul/li', timeout=10000)
-                                await page.click(f'//*[@id="selectAnocarro_chosen"]/div[@class="chosen-drop"]/ul/li[{ano_index+1}]')
+                                await page.wait_for_selector('//*[@id="selectAnocarro_chosen"]//li[contains(@class, "active-result")]', timeout=10000)
+                                anos = await page.query_selector_all('//*[@id="selectAnocarro_chosen"]//li[contains(@class, "active-result")]')
+                                await anos[ano_index].click()
 
                                 # Scroll até o botão e clica
                                 print("            Realizando busca no botão Pesquisar...")
