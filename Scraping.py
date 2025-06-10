@@ -1,9 +1,10 @@
 import pandas as pd
+import os
 import asyncio
 import sys
 import logging
 from tqdm import tqdm
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
 # Configura encoding e logging
 sys.stdout.reconfigure(encoding='utf-8')
@@ -13,18 +14,15 @@ Fipe = []
 
 async def abrir_dropdown_e_esperar(page, container_id):
     """Força o dropdown do Chosen a abrir corretamente."""
-    await page.evaluate(f"""() => {{
-        document.querySelector('#{container_id}').classList.remove('chosen-container-active');
-    }}""")
+    logging.info(f"Abrindo dropdown: {container_id}")
     await page.focus(f'div.chosen-container#{container_id} > a')
     await page.click(f'div.chosen-container#{container_id} > a')
-    await asyncio.sleep(1)  # Aguarda animação
+    await asyncio.sleep(1)
     await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=15000)
 
 async def clicar_dropdown_item(page, container_id, index):
-    """Clica no item do dropdown do Chosen sem scroll da página (evita fechar o dropdown)."""
+    """Clica no item do dropdown com hover + click (safe)."""
     locator = page.locator(f'div.chosen-container#{container_id} ul.chosen-results > li:nth-child({index + 1})')
-    await locator.wait_for(state="attached", timeout=5000)
     await locator.hover()
     await locator.click()
 
@@ -32,7 +30,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
         page = await browser.new_page()
-        
+
         try:
             logging.info("Acessando o site da FIPE...")
             await page.goto('https://veiculos.fipe.org.br/', timeout=120000)
@@ -44,8 +42,8 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
             # Seleciona tabela de referência
             logging.info("Selecionando Tabela de Referência...")
-            await abrir_dropdown_e_esperar(page, "selectTabelaReferencialcarro_chosen")
-            await clicar_dropdown_item(page, "selectTabelaReferencialcarro_chosen", 0)
+            await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
+            await clicar_dropdown_item(page, "selectTabelaReferenciacarro_chosen", 0)
 
             # Aguarda e coleta marcas
             logging.info("Aguardando carregamento de Marcas...")
