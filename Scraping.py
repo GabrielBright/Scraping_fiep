@@ -13,17 +13,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 Fipe = []
 
 async def abrir_dropdown_e_esperar(page, container_id):
-    """Força o dropdown do Chosen a abrir corretamente."""
     logging.info(f"Abrindo dropdown: {container_id}")
     await page.focus(f'div.chosen-container#{container_id} > a')
     await page.click(f'div.chosen-container#{container_id} > a')
     await asyncio.sleep(0.5)
-
-    # Espera o dropdown abrir
     await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=15000)
 
 async def selecionar_primeiro_item_teclado(page, container_id):
-#    Seleciona o primeiro item do dropdown via teclado (setinha + enter), evitando o bug de clique com scroll.
     logging.info(f"Selecionando primeiro item via teclado no dropdown {container_id}")
     try:
         await page.focus(f'div.chosen-container#{container_id} input.chosen-search-input')
@@ -33,7 +29,6 @@ async def selecionar_primeiro_item_teclado(page, container_id):
         await page.keyboard.press("Enter")
         await asyncio.sleep(0.5)
     except:
-        # Se não tiver campo de busca, usa foco no dropdown e seta + enter mesmo assim
         logging.info(f"Campo de busca não disponível em {container_id}, usando seta + enter no botão principal.")
         await page.focus(f'div.chosen-container#{container_id} > a')
         await page.keyboard.press("ArrowDown")
@@ -50,17 +45,14 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
             logging.info("Acessando o site da FIPE...")
             await page.goto('https://veiculos.fipe.org.br/', timeout=120000)
 
-            # Clica em "Consulta de Carros e Utilitários Pequenos"
             logging.info("Clicando em 'Consulta de Carros e Utilitários Pequenos'...")
             await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', state='visible', timeout=30000)
             await page.click('li:has-text("Carros e utilitários pequenos")')
 
-            # Seleciona tabela de referência
             logging.info("Selecionando Tabela de Referência...")
             await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
             await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")
 
-            # Aguarda e coleta marcas
             logging.info("Aguardando carregamento de Marcas...")
             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
             marcas = await page.query_selector_all('div.chosen-container#selectMarcacarro_chosen ul.chosen-results > li')
@@ -74,7 +66,6 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                     await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
                     await selecionar_primeiro_item_teclado(page, "selectMarcacarro_chosen")
 
-                    # Aguarda carregar modelos
                     logging.info("Aguardando carregamento de Modelos...")
                     await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                     modelos = await page.query_selector_all('div.chosen-container#selectAnoModelocarro_chosen ul.chosen-results > li')
@@ -88,7 +79,6 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                             await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                             await selecionar_primeiro_item_teclado(page, "selectAnoModelocarro_chosen")
 
-                            # Aguarda carregar anos
                             logging.info("  Aguardando carregamento de Anos...")
                             await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
                             anos = await page.query_selector_all('div.chosen-container#selectAnocarro_chosen ul.chosen-results > li')
@@ -102,50 +92,62 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                     await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
                                     await selecionar_primeiro_item_teclado(page, "selectAnocarro_chosen")
 
-                                    # Clica no botão Pesquisar
                                     logging.info("    Realizando busca...")
                                     botao_pesquisar = page.locator('#buttonPesquisarcarro')
                                     await botao_pesquisar.scroll_into_view_if_needed()
                                     await botao_pesquisar.click(force=True)
 
-                                    # Aguarda resultado
-                                    logging.info("    Aguardando resultado da pesquisa (aguardando texto preenchido)...")
+                                    for tentativa in range(3):
+                                        logging.info(f"    Tentativa {tentativa+1}/3 para carregar resultado...")
+                                        tabela_carregada = False
 
-                                    await page.wait_for_selector('table#resultadoConsultacarroFiltros', state='visible', timeout=60000)
+                                        max_tentativas_internas = 10
+                                        for tentativa_interna in range(max_tentativas_internas):
+                                            try:
+                                                await page.wait_for_function("""
+                                                    () => {
+                                                        const div = document.querySelector('div#resultadoConsultacarroFiltros');
+                                                        return div && window.getComputedStyle(div).display !== 'none';
+                                                    }
+                                                """, timeout=2000)
+                                                logging.info(f"    Tabela carregada com sucesso na tentativa interna {tentativa_interna+1}!")
+                                                tabela_carregada = True
+                                                break
+                                            except:
+                                                logging.info(f"    Tentativa interna {tentativa_interna+1}/{max_tentativas_internas}: tabela ainda não carregada...")
+                                                await asyncio.sleep(2)
 
-                                    # Aguarda o primeiro <p> (Mês de referência) ficar preenchido
-                                    await page.wait_for_function("""
-                                        () => {
-                                            const p = document.querySelector('table#resultadoConsultacarroFiltros tr:nth-child(1) td:nth-child(2) p');
-                                            return p && p.innerText.trim().length > 0;
-                                        }
-                                    """, timeout=60000)
+                                        if tabela_carregada:
+                                            break
+                                        else:
+                                            logging.warning("    Resultado não carregado, tentando clicar em PESQUISAR novamente...")
+                                            await botao_pesquisar.click(force=True)
+                                            await asyncio.sleep(2)
 
-                                    # Extrai os dados
-                                    mes_referencia = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(1) td:nth-child(2) p')
-                                    codigo_fipe    = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(2) td:nth-child(2) p')
-                                    marca_res      = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(3) td:nth-child(2) p')
-                                    modelo_res     = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(4) td:nth-child(2) p')
-                                    ano_modelo_res = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(5) td:nth-child(2) p')
+                                    linhas = await page.query_selector_all('table#resultadoConsultacarroFiltros tr')
+                                    dados_tabela = {}
+                                    for linha in linhas:
+                                        tds = await linha.query_selector_all('td')
+                                        if len(tds) >= 2:
+                                            nome_element = await tds[0].query_selector('p')
+                                            nome_coluna = await nome_element.inner_text() if nome_element else (await tds[0].inner_text())
 
-                                    try:
-                                        preco_medio = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(8) td:nth-child(2) p')
-                                    except:
-                                        preco_medio = "N/A"
+                                            valor_element = await tds[1].query_selector('p')
+                                            valor_coluna = await valor_element.inner_text() if valor_element else (await tds[1].inner_text())
+
+                                            dados_tabela[nome_coluna.strip()] = valor_coluna.strip()
+
+                                    logging.info(f"    Tabela completa coletada: {dados_tabela}")
 
                                     dados = {
                                         "MarcaSelecionada": nome_marca.strip(),
                                         "ModeloSelecionado": nome_modelo.strip(),
                                         "AnoSelecionado": nome_ano.strip(),
-                                        "MesReferencia": mes_referencia.strip(),
-                                        "CodigoFipe": codigo_fipe.strip(),
-                                        "MarcaResultado": marca_res.strip(),
-                                        "ModeloResultado": modelo_res.strip(),
-                                        "AnoModeloResultado": ano_modelo_res.strip(),
-                                        "PrecoMedio": preco_medio.strip()
+                                        **dados_tabela
                                     }
+
                                     Fipe.append(dados)
-                                    logging.info(f"    Dados coletados: {dados}")
+                                    logging.info(f"    Dados salvos no Fipe: {dados}")
 
                                     pd.DataFrame(Fipe).to_excel("Fipe_temp.xlsx", index=False)
 
