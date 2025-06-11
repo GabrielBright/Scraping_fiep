@@ -23,7 +23,7 @@ async def abrir_dropdown_e_esperar(page, container_id):
     await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=15000)
 
 async def selecionar_primeiro_item_teclado(page, container_id):
-    """Seleciona o primeiro item do dropdown via teclado (setinha + enter), evitando o bug de clique com scroll."""
+#    Seleciona o primeiro item do dropdown via teclado (setinha + enter), evitando o bug de clique com scroll.
     logging.info(f"Selecionando primeiro item via teclado no dropdown {container_id}")
     try:
         await page.focus(f'div.chosen-container#{container_id} input.chosen-search-input')
