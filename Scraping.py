@@ -19,26 +19,27 @@ async def abrir_dropdown_e_esperar(page, container_id):
     await page.click(f'div.chosen-container#{container_id} > a')
     await asyncio.sleep(0.5)
 
-    # Ativa o campo de input se existir (existe no de Marca!)
+    # Espera o dropdown abrir
+    await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=15000)
+
+async def selecionar_primeiro_item_teclado(page, container_id):
+    """Seleciona o primeiro item do dropdown via teclado (setinha + enter), evitando o bug de clique com scroll."""
+    logging.info(f"Selecionando primeiro item via teclado no dropdown {container_id}")
     try:
-        await page.fill(f'div.chosen-container#{container_id} input.chosen-search-input', '')
+        await page.focus(f'div.chosen-container#{container_id} input.chosen-search-input')
+        await asyncio.sleep(0.3)
+        await page.keyboard.press("ArrowDown")
+        await asyncio.sleep(0.3)
+        await page.keyboard.press("Enter")
         await asyncio.sleep(0.5)
-    except Exception:
-        pass  # Se não tiver input, segue normal (ex: dropdown de Anos não tem input)
-
-    # Espera o dropdown abrir de fato
-    await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=25000)
-
-async def clicar_dropdown_item(page, container_id):
-    """Clica diretamente no primeiro item ativo do dropdown, sem hover, para evitar fechar o dropdown com scroll."""
-    logging.info(f"Clicando no item de {container_id}")
-
-    # Espera ter pelo menos um item .active-result
-    await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li.active-result', timeout=6000)
-
-    locator = page.locator(f'div.chosen-container#{container_id} ul.chosen-results > li.active-result')
-    await locator.first.click()
-
+    except:
+        # Se não tiver campo de busca, usa foco no dropdown e seta + enter mesmo assim
+        logging.info(f"Campo de busca não disponível em {container_id}, usando seta + enter no botão principal.")
+        await page.focus(f'div.chosen-container#{container_id} > a')
+        await page.keyboard.press("ArrowDown")
+        await asyncio.sleep(0.3)
+        await page.keyboard.press("Enter")
+        await asyncio.sleep(0.5)
 
 async def run(max_marcas=None, max_modelos=None, max_anos=None):
     async with async_playwright() as p:
@@ -51,13 +52,13 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
             # Clica em "Consulta de Carros e Utilitários Pequenos"
             logging.info("Clicando em 'Consulta de Carros e Utilitários Pequenos'...")
-            await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', state='visible', timeout=60000)
+            await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', state='visible', timeout=30000)
             await page.click('li:has-text("Carros e utilitários pequenos")')
 
             # Seleciona tabela de referência
             logging.info("Selecionando Tabela de Referência...")
             await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
-            await clicar_dropdown_item(page, "selectTabelaReferenciacarro_chosen")
+            await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")
 
             # Aguarda e coleta marcas
             logging.info("Aguardando carregamento de Marcas...")
@@ -71,7 +72,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                     logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca.strip()}")
 
                     await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-                    await clicar_dropdown_item(page, "selectMarcacarro_chosen")
+                    await selecionar_primeiro_item_teclado(page, "selectMarcacarro_chosen")
 
                     # Aguarda carregar modelos
                     logging.info("Aguardando carregamento de Modelos...")
@@ -85,7 +86,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                             logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo.strip()}")
 
                             await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
-                            await clicar_dropdown_item(page, "selectAnoModelocarro_chosen")
+                            await selecionar_primeiro_item_teclado(page, "selectAnoModelocarro_chosen")
 
                             # Aguarda carregar anos
                             logging.info("  Aguardando carregamento de Anos...")
@@ -99,7 +100,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                     logging.info(f"    Ano [{ano_index+1}]: {nome_ano.strip()}")
 
                                     await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
-                                    await clicar_dropdown_item(page, "selectAnocarro_chosen")
+                                    await selecionar_primeiro_item_teclado(page, "selectAnocarro_chosen")
 
                                     # Clica no botão Pesquisar
                                     logging.info("    Realizando busca...")
@@ -109,18 +110,15 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
                                     # Aguarda resultado
                                     logging.info("    Aguardando resultado da pesquisa...")
-
-                                    # Aqui esperamos um <p> DENTRO da tabela, para garantir que os dados já renderizaram
                                     await page.wait_for_selector('table#resultadoConsultacarroFiltros p', state='attached', timeout=60000)
 
-                                    # Agora podemos extrair os dados
+                                    # Extrai os dados
                                     mes_referencia = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(1) td:nth-child(2) p')
                                     codigo_fipe    = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(2) td:nth-child(2) p')
                                     marca_res      = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(3) td:nth-child(2) p')
                                     modelo_res     = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(4) td:nth-child(2) p')
                                     ano_modelo_res = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(5) td:nth-child(2) p')
 
-                                    # Nem sempre a linha 8 (Preço Médio) existe! Fazemos um try/except
                                     try:
                                         preco_medio = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(8) td:nth-child(2) p')
                                     except:
@@ -140,7 +138,6 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                     Fipe.append(dados)
                                     logging.info(f"    Dados coletados: {dados}")
 
-                                    # Salva incrementalmente
                                     pd.DataFrame(Fipe).to_excel("Fipe_temp.xlsx", index=False)
 
                                 except Exception as e:
