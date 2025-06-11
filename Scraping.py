@@ -109,8 +109,17 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                     await botao_pesquisar.click(force=True)
 
                                     # Aguarda resultado
-                                    logging.info("    Aguardando resultado da pesquisa...")
-                                    await page.wait_for_selector('table#resultadoConsultacarroFiltros p', state='attached', timeout=60000)
+                                    logging.info("    Aguardando resultado da pesquisa (aguardando texto preenchido)...")
+
+                                    await page.wait_for_selector('table#resultadoConsultacarroFiltros', state='visible', timeout=60000)
+
+                                    # Aguarda o primeiro <p> (Mês de referência) ficar preenchido
+                                    await page.wait_for_function("""
+                                        () => {
+                                            const p = document.querySelector('table#resultadoConsultacarroFiltros tr:nth-child(1) td:nth-child(2) p');
+                                            return p && p.innerText.trim().length > 0;
+                                        }
+                                    """, timeout=60000)
 
                                     # Extrai os dados
                                     mes_referencia = await page.inner_text('table#resultadoConsultacarroFiltros tr:nth-child(1) td:nth-child(2) p')
