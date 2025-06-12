@@ -124,31 +124,57 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                             await botao_pesquisar.click(force=True)
                                             await asyncio.sleep(2)
 
+                                    await asyncio.sleep(5)  # Aguarda mais tempo para carregar
+
+                                    # Aguarda os elementos da tabela
+                                    await page.wait_for_selector('div#resultadoConsultacarroFiltros td', state='visible', timeout=10000)
+
+                                    # Captura direta dos valores específicos
+                                    codigo_fipe_elements = await page.locator('td:has-text("Código Fipe") + td p').all_text_contents()
+                                    preco_medio_elements = await page.locator('td:has-text("Preço Médio") + td p').all_text_contents()
+
+                                    # Filtra o primeiro valor válido
+                                    codigo_fipe = next((x.strip() for x in codigo_fipe_elements if x.strip() and not x.strip().startswith('{')), "")
+                                    preco_medio = next((x.strip().replace('R$', '').replace('.', '').replace(',', '.') for x in preco_medio_elements if x.strip() and not x.strip().startswith('{')), "")
+
+                                    # Verifica se os elementos foram encontrados
+                                    logging.info(f"    Código Fipe extraído: {codigo_fipe}")
+                                    logging.info(f"    Preço Médio extraído: {preco_medio}")
+
+                                    # Percorre os TRs da tabela corretamente (FIPE mistura TRs com 1 TD e com 2 TDs)
                                     linhas = await page.query_selector_all('table#resultadoConsultacarroFiltros tr')
                                     dados_tabela = {}
+                                    ultima_label = None
+
                                     for linha in linhas:
                                         tds = await linha.query_selector_all('td')
-                                        if len(tds) >= 2:
-                                            nome_element = await tds[0].query_selector('p')
-                                            nome_coluna = await nome_element.inner_text() if nome_element else (await tds[0].inner_text())
-
-                                            valor_element = await tds[1].query_selector('p')
-                                            valor_coluna = await valor_element.inner_text() if valor_element else (await tds[1].inner_text())
-
-                                            dados_tabela[nome_coluna.strip()] = valor_coluna.strip()
+                                        if len(tds) == 2:
+                                            nome_element = await tds[0].query_selector('p, strong')
+                                            valor_element = await tds[1].query_selector('p, strong')
+                                            nome_coluna = (await nome_element.inner_text()).strip() if nome_element else (await tds[0].inner_text()).strip()
+                                            valor_coluna = (await valor_element.inner_text()).strip() if valor_element else (await tds[1].inner_text()).strip()
+                                            dados_tabela[nome_coluna] = valor_coluna
+                                            ultima_label = nome_coluna
+                                        elif len(tds) == 1:
+                                            valor_element = await tds[0].query_selector('p, strong')
+                                            valor_coluna = (await valor_element.inner_text()).strip() if valor_element else (await tds[0].inner_text()).strip()
+                                            if ultima_label and 'noborder' in (await tds[0].get_attribute('class') or ''):
+                                                dados_tabela[ultima_label] = valor_coluna
 
                                     logging.info(f"    Tabela completa coletada: {dados_tabela}")
 
+                                    # Monta o dicionário com as colunas fixas + resto da tabela
                                     dados = {
                                         "MarcaSelecionada": nome_marca.strip(),
                                         "ModeloSelecionado": nome_modelo.strip(),
                                         "AnoSelecionado": nome_ano.strip(),
+                                        "CodigoFipe": codigo_fipe,
+                                        "PrecoMedio": preco_medio,
                                         **dados_tabela
                                     }
 
                                     Fipe.append(dados)
                                     logging.info(f"    Dados salvos no Fipe: {dados}")
-
                                     pd.DataFrame(Fipe).to_excel("Fipe_temp.xlsx", index=False)
 
                                 except Exception as e:
