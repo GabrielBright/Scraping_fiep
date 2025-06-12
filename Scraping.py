@@ -16,25 +16,25 @@ async def abrir_dropdown_e_esperar(page, container_id):
     logging.info(f"Abrindo dropdown: {container_id}")
     await page.focus(f'div.chosen-container#{container_id} > a')
     await page.click(f'div.chosen-container#{container_id} > a')
-    await asyncio.sleep(0.5)
-    await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=15000)
+    await asyncio.sleep(1)  # Aumentei o delay para 1 segundo
+    await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=20000)
 
 async def selecionar_primeiro_item_teclado(page, container_id):
     logging.info(f"Selecionando primeiro item via teclado no dropdown {container_id}")
     try:
         await page.focus(f'div.chosen-container#{container_id} input.chosen-search-input')
-        await asyncio.sleep(0.3)
-        await page.keyboard.press("ArrowDown")
-        await asyncio.sleep(0.3)
-        await page.keyboard.press("Enter")
         await asyncio.sleep(0.5)
+        await page.keyboard.press("ArrowDown")
+        await asyncio.sleep(0.5)
+        await page.keyboard.press("Enter")
+        await asyncio.sleep(1)  # Aumentei o delay para 1 segundo
     except:
         logging.info(f"Campo de busca não disponível em {container_id}, usando seta + enter no botão principal.")
         await page.focus(f'div.chosen-container#{container_id} > a')
         await page.keyboard.press("ArrowDown")
-        await asyncio.sleep(0.3)
-        await page.keyboard.press("Enter")
         await asyncio.sleep(0.5)
+        await page.keyboard.press("Enter")
+        await asyncio.sleep(1)  # Aumentei o delay para 1 segundo
 
 async def run(max_marcas=None, max_modelos=None, max_anos=None):
     async with async_playwright() as p:
@@ -192,7 +192,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
             await browser.close()
 
 if __name__ == "__main__":
-    asyncio.run(run(max_marcas=3, max_modelos=2, max_anos=2))
+    asyncio.run(run(max_marcas=None, max_modelos=None, max_anos=None))
 
     Fipe_df = pd.DataFrame(Fipe)
     print("\n\nDADOS FINAIS COLETADOS")
