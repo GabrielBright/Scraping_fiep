@@ -16,26 +16,70 @@ async def abrir_dropdown_e_esperar(page, container_id):
     logging.info(f"Abrindo dropdown: {container_id}")
     await page.focus(f'div.chosen-container#{container_id} > a')
     await page.click(f'div.chosen-container#{container_id} > a')
-    await asyncio.sleep(1)  # Aumentei o delay para 1 segundo
+    await asyncio.sleep(2)
     await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=20000)
+
+async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
+    logging.info(f"Selecionando item {index+1} no dropdown {container_id}")
+    await abrir_dropdown_e_esperar(page, container_id)
+    await page.focus(f'div.chosen-container#{container_id} > a')
+    await asyncio.sleep(0.5)
+
+    if use_arrow:
+        await page.keyboard.press("Home")
+        await asyncio.sleep(0.3)
+        for _ in range(index):
+            await page.keyboard.press("ArrowDown")
+            await asyncio.sleep(0.3)
+        await page.keyboard.press("Enter")
+        await asyncio.sleep(1)
+    else:
+        items = await page.query_selector_all(f'div.chosen-container#{container_id} ul.chosen-results > li')
+        if not items:
+            logging.warning(f"Dropdown {container_id} não carregou itens!")
+            return
+        if index >= len(items):
+            logging.warning(f"Index {index} fora do range no dropdown {container_id} (total: {len(items)})")
+            return
+        await items[index].scroll_into_view_if_needed()
+        await asyncio.sleep(0.3)
+        item_text = await items[index].text_content()
+        logging.info(f"Clicando no item '{item_text.strip()}'")
+        await items[index].click()
+        await asyncio.sleep(1)
 
 async def selecionar_primeiro_item_teclado(page, container_id):
     logging.info(f"Selecionando primeiro item via teclado no dropdown {container_id}")
     try:
         await page.focus(f'div.chosen-container#{container_id} input.chosen-search-input')
-        await asyncio.sleep(0.5)
-        await page.keyboard.press("ArrowDown")
-        await asyncio.sleep(0.5)
-        await page.keyboard.press("Enter")
-        await asyncio.sleep(1)  # Aumentei o delay para 1 segundo
     except:
-        logging.info(f"Campo de busca não disponível em {container_id}, usando seta + enter no botão principal.")
         await page.focus(f'div.chosen-container#{container_id} > a')
-        await page.keyboard.press("ArrowDown")
-        await asyncio.sleep(0.5)
-        await page.keyboard.press("Enter")
-        await asyncio.sleep(1)  # Aumentei o delay para 1 segundo
 
+    items = await page.query_selector_all(f'div.chosen-container#{container_id} ul.chosen-results > li')
+    if items and len(items) > 0:
+        first_item_text = await items[0].text_content()
+        current_selection = await page.eval_on_selector(f'div.chosen-container#{container_id} a span', 'el => el.innerText')
+        if current_selection and first_item_text.strip() in current_selection:
+            logging.info(f"Primeiro item '{first_item_text.strip()}' já está selecionado, pressionando Enter diretamente.")
+            await page.keyboard.press("Enter")
+        else:
+            await asyncio.sleep(0.5)
+            await page.keyboard.press("ArrowDown")
+            await asyncio.sleep(0.5)
+            await page.keyboard.press("Enter")
+        await asyncio.sleep(1)
+
+async def limpar_pesquisa(page):
+    try:
+        await page.wait_for_selector('#buttonLimparPesquisarcarro a.text', state='visible', timeout=5000)
+        limpar_link = page.locator('#buttonLimparPesquisarcarro a.text')
+        await limpar_link.scroll_into_view_if_needed()
+        await limpar_link.click()
+        logging.info(">>> Pesquisa limpa com sucesso.")
+        await asyncio.sleep(2)
+    except Exception as e:
+        logging.warning(f"[ERRO ao tentar limpar pesquisa]: {e}")
+        
 async def run(max_marcas=None, max_modelos=None, max_anos=None):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
@@ -64,7 +108,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                     logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca.strip()}")
 
                     await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-                    await selecionar_primeiro_item_teclado(page, "selectMarcacarro_chosen")
+                    await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
 
                     logging.info("Aguardando carregamento de Modelos...")
                     await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
@@ -77,7 +121,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                             logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo.strip()}")
 
                             await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
-                            await selecionar_primeiro_item_teclado(page, "selectAnoModelocarro_chosen")
+                            await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
 
                             logging.info("  Aguardando carregamento de Anos...")
                             await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
@@ -90,58 +134,39 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                     logging.info(f"    Ano [{ano_index+1}]: {nome_ano.strip()}")
 
                                     await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
-                                    await selecionar_primeiro_item_teclado(page, "selectAnocarro_chosen")
+                                    await selecionar_item_por_index(page, "selectAnocarro_chosen", ano_index, use_arrow=True)
 
                                     logging.info("    Realizando busca...")
                                     botao_pesquisar = page.locator('#buttonPesquisarcarro')
                                     await botao_pesquisar.scroll_into_view_if_needed()
                                     await botao_pesquisar.click(force=True)
 
-                                    for tentativa in range(3):
-                                        logging.info(f"    Tentativa {tentativa+1}/3 para carregar resultado...")
-                                        tabela_carregada = False
+                                    await asyncio.sleep(5)
 
-                                        max_tentativas_internas = 10
-                                        for tentativa_interna in range(max_tentativas_internas):
-                                            try:
-                                                await page.wait_for_function("""
-                                                    () => {
-                                                        const div = document.querySelector('div#resultadoConsultacarroFiltros');
-                                                        return div && window.getComputedStyle(div).display !== 'none';
-                                                    }
-                                                """, timeout=2000)
-                                                logging.info(f"    Tabela carregada com sucesso na tentativa interna {tentativa_interna+1}!")
-                                                tabela_carregada = True
-                                                break
-                                            except:
-                                                logging.info(f"    Tentativa interna {tentativa_interna+1}/{max_tentativas_internas}: tabela ainda não carregada...")
-                                                await asyncio.sleep(2)
-
-                                        if tabela_carregada:
-                                            break
-                                        else:
-                                            logging.warning("    Resultado não carregado, tentando clicar em PESQUISAR novamente...")
-                                            await botao_pesquisar.click(force=True)
-                                            await asyncio.sleep(2)
-
-                                    await asyncio.sleep(5)  # Aguarda mais tempo para carregar
-
-                                    # Aguarda os elementos da tabela
                                     await page.wait_for_selector('div#resultadoConsultacarroFiltros td', state='visible', timeout=10000)
 
-                                    # Captura direta dos valores específicos
-                                    codigo_fipe_elements = await page.locator('td:has-text("Código Fipe") + td p').all_text_contents()
-                                    preco_medio_elements = await page.locator('td:has-text("Preço Médio") + td p').all_text_contents()
+                                    codigo_fipe = ""
+                                    preco_medio = ""
 
-                                    # Filtra o primeiro valor válido
-                                    codigo_fipe = next((x.strip() for x in codigo_fipe_elements if x.strip() and not x.strip().startswith('{')), "")
-                                    preco_medio = next((x.strip().replace('R$', '').replace('.', '').replace(',', '.') for x in preco_medio_elements if x.strip() and not x.strip().startswith('{')), "")
+                                    tabela = await page.query_selector('table#resultadoConsultacarroFiltros')
+                                    if tabela:
+                                        linhas = await tabela.query_selector_all('tr')
+                                        for linha in linhas:
+                                            tds = await linha.query_selector_all('td')
+                                            if len(tds) >= 2:
+                                                texto_coluna = await tds[0].inner_text()
+                                                if "Código Fipe" in texto_coluna:
+                                                    codigo_fipe_element = await tds[1].query_selector('p')
+                                                    codigo_fipe = await codigo_fipe_element.inner_text() if codigo_fipe_element else ""
+                                                elif "Preço Médio" in texto_coluna:
+                                                    preco_medio_element = await tds[1].query_selector('p')
+                                                    preco_medio = await preco_medio_element.inner_text() if preco_medio_element else ""
 
-                                    # Verifica se os elementos foram encontrados
+                                    preco_medio = preco_medio.strip().replace('R$', '').replace('.', '').replace(',', '.') if preco_medio else ""
+
                                     logging.info(f"    Código Fipe extraído: {codigo_fipe}")
                                     logging.info(f"    Preço Médio extraído: {preco_medio}")
 
-                                    # Percorre os TRs da tabela corretamente (FIPE mistura TRs com 1 TD e com 2 TDs)
                                     linhas = await page.query_selector_all('table#resultadoConsultacarroFiltros tr')
                                     dados_tabela = {}
                                     ultima_label = None
@@ -161,9 +186,6 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                             if ultima_label and 'noborder' in (await tds[0].get_attribute('class') or ''):
                                                 dados_tabela[ultima_label] = valor_coluna
 
-                                    logging.info(f"    Tabela completa coletada: {dados_tabela}")
-
-                                    # Monta o dicionário com as colunas fixas + resto da tabela
                                     dados = {
                                         "MarcaSelecionada": nome_marca.strip(),
                                         "ModeloSelecionado": nome_modelo.strip(),
@@ -180,9 +202,15 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                 except Exception as e:
                                     logging.warning(f"[ERRO] Ano [{ano_index+1}] do Modelo [{nome_modelo.strip()}]: {e}")
                                     await asyncio.sleep(2)
-                        except Exception as e:
-                            logging.warning(f"[ERRO] Modelo [{modelo_index+1}] da Marca [{nome_marca.strip()}]: {e}")
-                            await asyncio.sleep(2)
+                                    
+                        finally:
+                            # --- Limpar Pesquisa (após Modelo)
+                            await limpar_pesquisa(page)
+
+                            # Reposiciona dropdown para a Marca atual novamente
+                            await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+                            await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+
                 except Exception as e:
                     logging.warning(f"[ERRO] Marca [{marca_index+1}]: {e}")
 
