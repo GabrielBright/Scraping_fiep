@@ -130,6 +130,16 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
                             for ano_index in range(max_anos_loop):
                                 try:
+                                    # Limpa antes de cada tentativa
+                                    await limpar_pesquisa(page)
+
+                                    await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+                                    await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+
+                                    await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+                                    await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
+
+                                    # Agora segue normalmente com o ano
                                     nome_ano = await anos[ano_index].text_content()
                                     logging.info(f"    Ano [{ano_index+1}]: {nome_ano.strip()}")
 
