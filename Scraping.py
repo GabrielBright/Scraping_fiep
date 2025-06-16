@@ -26,8 +26,17 @@ async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
     await asyncio.sleep(0.5)
 
     if use_arrow:
+    # Sempre garante o item 0 como selecionado antes de navegar
         await page.keyboard.press("Home")
         await asyncio.sleep(0.3)
+        await page.keyboard.press("Enter")  # Seleciona o primeiro item real
+        await asyncio.sleep(1)
+
+        # Reabre o dropdown para navegação ao índice desejado
+        await abrir_dropdown_e_esperar(page, container_id)
+        await page.focus(f'div.chosen-container#{container_id} > a')
+        await asyncio.sleep(0.3)
+
         for _ in range(index):
             await page.keyboard.press("ArrowDown")
             await asyncio.sleep(0.3)
@@ -77,8 +86,23 @@ async def limpar_pesquisa(page):
         await limpar_link.click()
         logging.info(">>> Pesquisa limpa com sucesso.")
         await asyncio.sleep(2)
+
+        await page.wait_for_function(
+            """() => {
+                const span = document.querySelector('#selectMarcacarro_chosen a span');
+                return span && span.textContent.toLowerCase().includes('selecione');
+            }""",
+            timeout=10000
+        )
+        logging.info(">>> Confirmação visual: dropdown de Marca resetado.")
     except Exception as e:
         logging.warning(f"[ERRO ao tentar limpar pesquisa]: {e}")
+
+async def fechar_todos_dropdowns(page):
+    await page.keyboard.press("Escape")
+    await asyncio.sleep(0.3)
+    await page.evaluate("document.activeElement.blur();")
+    await asyncio.sleep(0.3)
 
 async def run(max_marcas=None, max_modelos=None, max_anos=None):
     async with async_playwright() as p:
@@ -123,23 +147,29 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                             await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                             await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
 
-                            logging.info("  Aguardando carregamento de Anos...")
                             await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
                             anos = await page.query_selector_all('div.chosen-container#selectAnocarro_chosen ul.chosen-results > li')
                             max_anos_loop = len(anos) if max_anos is None else min(max_anos, len(anos))
 
+                            primeiro_ano_para_modelo = True
+
                             for ano_index in range(max_anos_loop):
                                 try:
-                                    # Limpa antes de cada tentativa
                                     await limpar_pesquisa(page)
+                                    await asyncio.sleep(1.5)
 
-                                    await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-                                    await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+                                     # Só reabre Marca e Modelo se não for a primeira vez (ano_index > 0)
+                                    if ano_index > 0:
+                                        await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+                                        await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+                                        await page.keyboard.press("Escape")
+                                        await asyncio.sleep(0.3)
 
-                                    await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
-                                    await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
+                                        await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+                                        await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
+                                        await page.keyboard.press("Escape")
+                                        await asyncio.sleep(0.3)
 
-                                    # Agora segue normalmente com o ano
                                     nome_ano = await anos[ano_index].text_content()
                                     logging.info(f"    Ano [{ano_index+1}]: {nome_ano.strip()}")
 
@@ -151,11 +181,9 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                     await botao_pesquisar.scroll_into_view_if_needed()
                                     await botao_pesquisar.click(force=True)
 
-                                    # Aguarda a tabela estar visível
                                     await asyncio.sleep(5)
                                     await page.wait_for_selector('div#resultadoConsultacarroFiltros', state='visible', timeout=30000)
 
-                                    # NOVA forma de capturar Código Fipe e Preço Médio
                                     codigo_fipe_elements = await page.locator('td:has-text("Código Fipe") + td p').all_text_contents()
                                     preco_medio_elements = await page.locator('td:has-text("Preço Médio") + td p').all_text_contents()
 
@@ -165,7 +193,6 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                     logging.info(f"    Código Fipe extraído: {codigo_fipe}")
                                     logging.info(f"    Preço Médio extraído: {preco_medio}")
 
-                                    # Extrai dados adicionais da tabela
                                     linhas = await page.query_selector_all('table#resultadoConsultacarroFiltros tr')
                                     dados_tabela = {}
                                     ultima_label = None
@@ -203,10 +230,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                     await asyncio.sleep(2)
 
                         finally:
-                            # Limpar Pesquisa (após Modelo)
                             await limpar_pesquisa(page)
-
-                            # Reposiciona dropdown para a Marca atual novamente
                             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
                             await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
 
