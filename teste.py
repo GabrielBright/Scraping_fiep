@@ -136,8 +136,22 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
                     logging.info("Aguardando carregamento de Modelos...")
                     await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+
+                    # Aguarda 2.5 segundos para garantir atualização do DOM com os modelos corretos
+                    await asyncio.sleep(2.5)
+
+                    # Recarrega os modelos após a espera
                     modelos = await page.query_selector_all('div.chosen-container#selectAnoModelocarro_chosen ul.chosen-results > li')
-                    max_modelos_loop = len(modelos) if max_modelos is None else min(max_modelos, len(modelos))
+                    modelos_texto = [await m.text_content() for m in modelos]
+                    modelos_texto = [m.strip() for m in modelos_texto if m.strip()]
+
+                    # Verifica se os modelos parecem estar carregados corretamente
+                    if not modelos_texto:
+                        logging.warning(f" Nenhum modelo encontrado para a marca '{nome_marca.strip()}'. Pulando marca.")
+                        continue
+
+                    max_modelos_loop = len(modelos_texto) if max_modelos is None else min(max_modelos, len(modelos_texto))
+
 
                     for modelo_index in range(max_modelos_loop):
                         try:
