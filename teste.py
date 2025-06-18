@@ -26,17 +26,30 @@ async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
     await asyncio.sleep(0.5)
 
     if use_arrow:
-    # Sempre garante o item 0 como selecionado antes de navegar
-        await page.keyboard.press("Home")
-        await asyncio.sleep(0.3)
-        await page.keyboard.press("Enter")  # Seleciona o primeiro item real
-        await asyncio.sleep(1)
+        
+        # Sempre garante o item 0 como selecionado antes de navegar
+        #await page.keyboard.press("Home")
+        #await asyncio.sleep(0.3)
+        #await page.keyboard.press("Enter")  # Seleciona o primeiro item real
+        #await asyncio.sleep(1)
 
+        # Fecha qualquer dropdown aberto
+        await page.keyboard.press("Escape")
+        await asyncio.sleep(0.6)
+        await page.keyboard.press("Escape")
+        await asyncio.sleep(0.6)
+        
         # Reabre o dropdown para navegação ao índice desejado
         await abrir_dropdown_e_esperar(page, container_id)
         await page.focus(f'div.chosen-container#{container_id} > a')
         await asyncio.sleep(0.3)
-
+        
+        # Usa a seta para cima para voltar para o topo da lista
+        for _ in range(150):
+            await page.keyboard.press("ArrowUp")
+            await asyncio.sleep(0.05)
+        
+        # Navega até o indice que eu quero
         for _ in range(index):
             await page.keyboard.press("ArrowDown")
             await asyncio.sleep(0.3)
@@ -136,22 +149,8 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
                     logging.info("Aguardando carregamento de Modelos...")
                     await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
-
-                    # Aguarda 2.5 segundos para garantir atualização do DOM com os modelos corretos
-                    await asyncio.sleep(2.5)
-
-                    # Recarrega os modelos após a espera
                     modelos = await page.query_selector_all('div.chosen-container#selectAnoModelocarro_chosen ul.chosen-results > li')
-                    modelos_texto = [await m.text_content() for m in modelos]
-                    modelos_texto = [m.strip() for m in modelos_texto if m.strip()]
-
-                    # Verifica se os modelos parecem estar carregados corretamente
-                    if not modelos_texto:
-                        logging.warning(f" Nenhum modelo encontrado para a marca '{nome_marca.strip()}'. Pulando marca.")
-                        continue
-
-                    max_modelos_loop = len(modelos_texto) if max_modelos is None else min(max_modelos, len(modelos_texto))
-
+                    max_modelos_loop = len(modelos) if max_modelos is None else min(max_modelos, len(modelos))
 
                     for modelo_index in range(max_modelos_loop):
                         try:
