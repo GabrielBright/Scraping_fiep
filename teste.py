@@ -44,10 +44,27 @@ async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
         await page.focus(f'div.chosen-container#{container_id} > a')
         await asyncio.sleep(0.3)
         
-        # Usa a seta para cima para voltar para o topo da lista
-        for _ in range(150):
+        ultimo_texto = ""
+        tentativas = 0
+        max_tentativas = 30
+        
+        while tentativas < max_tentativas:
+            itens = await page.query_selector_all(f'div.chosen-container#{container_id} ul.chosen-results > li.highlighted')
+            if itens:
+                texto_atual = await itens[0].text_content()
+                texto_atual = texto_atual.strip() if texto_atual else ""
+                if texto_atual == ultimo_texto:
+                    break
+                ultimo_texto = texto_atual
+            
             await page.keyboard.press("ArrowUp")
             await asyncio.sleep(0.05)
+            tentativas += 1  
+        
+        # Usa a seta para cima para voltar para o topo da lista
+        #for _ in range(150):
+        #    await page.keyboard.press("ArrowUp")
+        #    await asyncio.sleep(0.05)
         
         # Navega até o indice que eu quero
         for _ in range(index):

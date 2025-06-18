@@ -26,17 +26,47 @@ async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
     await asyncio.sleep(0.5)
 
     if use_arrow:
-    # Sempre garante o item 0 como selecionado antes de navegar
-        await page.keyboard.press("Home")
-        await asyncio.sleep(0.3)
-        await page.keyboard.press("Enter")  # Seleciona o primeiro item real
-        await asyncio.sleep(1)
+        
+        # Sempre garante o item 0 como selecionado antes de navegar
+        #await page.keyboard.press("Home")
+        #await asyncio.sleep(0.3)
+        #await page.keyboard.press("Enter")  # Seleciona o primeiro item real
+        #await asyncio.sleep(1)
 
+        # Fecha qualquer dropdown aberto
+        await page.keyboard.press("Escape")
+        await asyncio.sleep(0.6)
+        await page.keyboard.press("Escape")
+        await asyncio.sleep(0.6)
+        
         # Reabre o dropdown para navegação ao índice desejado
         await abrir_dropdown_e_esperar(page, container_id)
         await page.focus(f'div.chosen-container#{container_id} > a')
         await asyncio.sleep(0.3)
-
+        
+        ultimo_texto = ""
+        tentativas = 0
+        max_tentativas = 30
+        
+        while tentativas < max_tentativas:
+            itens = await page.query_selector_all(f'div.chosen-container#{container_id} ul.chosen-results > li.highlighted')
+            if itens:
+                texto_atual = await itens[0].text_content()
+                texto_atual = texto_atual.strip() if texto_atual else ""
+                if texto_atual == ultimo_texto:
+                    break
+                ultimo_texto = texto_atual
+            
+            await page.keyboard.press("ArrowUp")
+            await asyncio.sleep(0.05)
+            tentativas += 1  
+        
+        # Usa a seta para cima para voltar para o topo da lista
+        #for _ in range(150):
+        #    await page.keyboard.press("ArrowUp")
+        #    await asyncio.sleep(0.05)
+        
+        # Navega até o indice que eu quero
         for _ in range(index):
             await page.keyboard.press("ArrowDown")
             await asyncio.sleep(0.3)
