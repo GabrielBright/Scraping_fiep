@@ -5,12 +5,32 @@ import sys
 import logging
 from tqdm import tqdm
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+import json 
 
 # Configura encoding e logging
 sys.stdout.reconfigure(encoding='utf-8')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 Fipe = []
+
+# Cria json se não houver Log de Marcas
+if not os.path.exists("marcas_processadas.json"):
+    with open("marcas_processadas.json", "w") as f:
+        json.dump([], f)
+
+# Carrega as Marcas do Json
+def carregar_marcas_processadas():
+    try:
+        with open("marcas_processadas.json", "r") as f:
+            return set(json.load(f))
+    except Exception as e:
+        logging.warning(f"Não foi possivel carregar as marcas processadas {e}")
+        return set()
+
+# Salva as marcas no json
+def salvar_marcas_processadas(marcas_processadas):
+    with open("marcas_processadas.json", "w") as f:
+        json.dump(list(marcas_processadas),f)
 
 async def abrir_dropdown_e_esperar(page, container_id):
     logging.info(f"Abrindo dropdown: {container_id}")
@@ -135,6 +155,7 @@ async def fechar_todos_dropdowns(page):
     await asyncio.sleep(0.3)
 
 async def run(max_marcas=None, max_modelos=None, max_anos=None):
+    marcas_processadas = carregar_marcas_processadas()
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
         page = await browser.new_page()
@@ -157,6 +178,13 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
             max_marcas = len(marcas) if max_marcas is None else min(max_marcas, len(marcas))
 
             for marca_index in tqdm(range(max_marcas), desc="Marcas"):
+                
+                nome_marcas = await marcas[marca_index].text_content()
+                
+                if nome_marcas.strip() in marcas_processadas:
+                    logging.warning(f"[SKIP] Marca {marca_index+1} já processada. Pulando.")
+                    continue
+                
                 try:
                     nome_marca = await marcas[marca_index].text_content()
                     logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca.strip()}")
@@ -263,6 +291,9 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                             await limpar_pesquisa(page)
                             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
                             await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+                            
+                            marcas_processadas.add(nome_marcas.strip())
+                            salvar_marcas_processadas(marcas_processadas)
 
                 except Exception as e:
                     logging.warning(f"[ERRO] Marca [{marca_index+1}]: {e}")
