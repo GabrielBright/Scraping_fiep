@@ -1,0 +1,3 @@
+ - > eu queria colocar para seguir a ordem se terminou os indices [0], [1], [2] tem que ir para o [3] e não pular então pode mos colocar para pegar o 3 e não pular como o BUG está fazendo fazer 
+
+ - > Colocar apra em Marca em vez de usar a seta para cima usar o indice/nome da marca como forma de localizar a proxima Marca 

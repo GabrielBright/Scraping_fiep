@@ -13,10 +13,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 Fipe = []
 
+# Cria json se não houver Log de Marcas
 if not os.path.exists("marcas_processadas.json"):
     with open("marcas_processadas.json", "w") as f:
         json.dump([], f)
 
+# Carrega as Marcas do Json
 def carregar_marcas_processadas():
     try:
         with open("marcas_processadas.json", "r") as f:
@@ -25,6 +27,7 @@ def carregar_marcas_processadas():
         logging.warning(f"Não foi possivel carregar as marcas processadas {e}")
         return set()
 
+# Salva as marcas no json
 def salvar_marcas_processadas(marcas_processadas):
     with open("marcas_processadas.json", "w") as f:
         json.dump(list(marcas_processadas),f)
