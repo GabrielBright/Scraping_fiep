@@ -175,11 +175,20 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
             logging.info("Aguardando carregamento de Marcas...")
             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
             marcas = await page.query_selector_all('div.chosen-container#selectMarcacarro_chosen ul.chosen-results > li')
+            
+            marcas_lista = [await m.text_content() for m in marcas]
+            marcas_lista = [m.strip() for m in marcas_lista]
+            
+            logging.warning(f"[VERIFICAÇÃO] Total de marcas mapeadas: {len(marcas_lista)}")
+            for i, nome in enumerate(marcas_lista):
+                logging.warning(f"Marca: [{1+i}]: {nome}")
+            
             max_marcas = len(marcas) if max_marcas is None else min(max_marcas, len(marcas))
 
             for marca_index in tqdm(range(max_marcas), desc="Marcas"):
                 
                 nome_marcas = await marcas[marca_index].text_content()
+                nome_marca = marcas_lista[marca_index]
                 
                 if nome_marcas.strip() in marcas_processadas:
                     logging.warning(f"[SKIP] Marca {marca_index+1} já processada. Pulando.")
@@ -250,6 +259,17 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
                                     logging.info(f"    Código Fipe extraído: {codigo_fipe}")
                                     logging.info(f"    Preço Médio extraído: {preco_medio}")
+                                    
+                                    # Mesmo estilo para os outros campos importantes:
+                                    mes_referencia_elements = await page.locator('td:has-text("Mês de referência") + td p').all_text_contents()
+                                    marca_elements = await page.locator('td:has-text("Marca") + td p').all_text_contents()
+                                    modelo_elements = await page.locator('td:has-text("Modelo") + td p').all_text_contents()
+                                    ano_modelo_elements = await page.locator('td:has-text("Ano Modelo") + td p').all_text_contents()
+
+                                    mes_referencia = next((x.strip() for x in mes_referencia_elements if x.strip() and not x.strip().startswith('{')), "")
+                                    marca = next((x.strip() for x in marca_elements if x.strip() and not x.strip().startswith('{')), "")
+                                    modelo = next((x.strip() for x in modelo_elements if x.strip() and not x.strip().startswith('{')), "")
+                                    ano_modelo = next((x.strip() for x in ano_modelo_elements if x.strip() and not x.strip().startswith('{')), "")
 
                                     linhas = await page.query_selector_all('table#resultadoConsultacarroFiltros tr')
                                     dados_tabela = {}
@@ -271,11 +291,12 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                                 dados_tabela[ultima_label] = valor_coluna
 
                                     dados = {
-                                        "MarcaSelecionada": nome_marca.strip(),
-                                        "ModeloSelecionado": nome_modelo.strip(),
-                                        "AnoSelecionado": nome_ano.strip(),
+                                        "MarcaSelecionada": marca,
+                                        "ModeloSelecionado": modelo,
+                                        "AnoSelecionado": ano_modelo,
                                         "CodigoFipe": codigo_fipe,
                                         "PrecoMedio": preco_medio,
+                                        "Mes Referencia": mes_referencia,
                                         **dados_tabela
                                     }
 
