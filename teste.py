@@ -46,12 +46,6 @@ async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
     await asyncio.sleep(0.5)
 
     if use_arrow:
-        
-        # Sempre garante o item 0 como selecionado antes de navegar
-        #await page.keyboard.press("Home")
-        #await asyncio.sleep(0.3)
-        #await page.keyboard.press("Enter")  # Seleciona o primeiro item real
-        #await asyncio.sleep(1)
 
         # Fecha qualquer dropdown aberto
         await page.keyboard.press("Escape")
@@ -80,11 +74,6 @@ async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
             await page.keyboard.press("ArrowUp")
             await asyncio.sleep(0.05)
             tentativas += 1  
-        
-        # Usa a seta para cima para voltar para o topo da lista
-        #for _ in range(150):
-        #    await page.keyboard.press("ArrowUp")
-        #    await asyncio.sleep(0.05)
         
         # Navega até o indice que eu quero
         for _ in range(index):
@@ -186,6 +175,23 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
             max_marcas = len(marcas) if max_marcas is None else min(max_marcas, len(marcas))
 
             for marca_index in tqdm(range(max_marcas), desc="Marcas"):
+                
+                try:
+                    await page.goto('https://veiculos.fipe.org.br/', timeout=120000)
+
+                    await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', timeout=30000)
+                    await page.click('li:has-text("Carros e utilitários pequenos")')
+
+                    await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
+                    await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")
+
+                    await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+                    marcas = await page.query_selector_all('div.chosen-container#selectMarcacarro_chosen ul.chosen-results > li')
+                    marcas_lista = [await m.text_content() for m in marcas]
+                    marcas_lista = [m.strip() for m in marcas_lista]
+                except Exception as e:
+                    logging.warning(f"[ERRO ao reinicializar página para marca {marca_index}]: {e}")
+                    continue
                 
                 nome_marcas = await marcas[marca_index].text_content()
                 nome_marca = marcas_lista[marca_index]
