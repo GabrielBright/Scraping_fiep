@@ -32,37 +32,12 @@ def salvar_marcas_processadas(marcas_processadas):
     with open("marcas_processadas.json", "w") as f:
         json.dump(list(marcas_processadas),f)
 
-# Abre a seleção/Dropdown e espera
 async def abrir_dropdown_e_esperar(page, container_id):
     logging.info(f"Abrindo dropdown: {container_id}")
     await page.focus(f'div.chosen-container#{container_id} > a')
     await page.click(f'div.chosen-container#{container_id} > a')
     await asyncio.sleep(2)
     await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=20000)
-
-# Feito para selecionar a Marca atravez do nome
-async def selecionar_item_por_nome(page, container_id, nome_desejado):
-    await abrir_dropdown_e_esperar(page, container_id)
-    await page.focus(f'div.chosen-container#{container_id} > a')
-    await asyncio.sleep(0.3)
-
-    itens = await page.query_selector_all(f'div.chosen-container#{container_id} ul.chosen-results > li')
-    for i, item in enumerate(itens):
-        texto = (await item.text_content()).strip()
-        if texto.lower() == nome_desejado.lower():
-            logging.info(f"Selecionando por nome '{texto}' no dropdown {container_id}")
-            await item.scroll_into_view_if_needed()
-            await asyncio.sleep(0.2)
-            await page.keyboard.press("Home")
-            await asyncio.sleep(0.1)
-            for _ in range(i):
-                await page.keyboard.press("ArrowDown")
-                await asyncio.sleep(0.2)
-            await page.keyboard.press("Enter")
-            await asyncio.sleep(1)
-            return
-    
-    logging.warning(f"[NOME NÃO ENCONTRADO] '{nome_desejado}' não está disponível no dropdown {container_id}")
 
 async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
     logging.info(f"Selecionando item {index+1} no dropdown {container_id}")
@@ -215,7 +190,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                     logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca.strip()}")
 
                     await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-                    await selecionar_item_por_nome(page, "selectMarcacarro_chosen", nome_marca.strip())
+                    await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
 
                     logging.info("Aguardando carregamento de Modelos...")
                     await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
@@ -275,6 +250,17 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
                                     logging.info(f"    Código Fipe extraído: {codigo_fipe}")
                                     logging.info(f"    Preço Médio extraído: {preco_medio}")
+                                    
+                                    # Mesmo estilo para os outros campos importantes:
+                                    mes_referencia_elements = await page.locator('td:has-text("Mês de referência") + td p').all_text_contents()
+                                    marca_elements = await page.locator('td:has-text("Marca") + td p').all_text_contents()
+                                    modelo_elements = await page.locator('td:has-text("Modelo") + td p').all_text_contents()
+                                    ano_modelo_elements = await page.locator('td:has-text("Ano Modelo") + td p').all_text_contents()
+
+                                    mes_referencia = next((x.strip() for x in mes_referencia_elements if x.strip() and not x.strip().startswith('{')), "")
+                                    marca = next((x.strip() for x in marca_elements if x.strip() and not x.strip().startswith('{')), "")
+                                    modelo = next((x.strip() for x in modelo_elements if x.strip() and not x.strip().startswith('{')), "")
+                                    ano_modelo = next((x.strip() for x in ano_modelo_elements if x.strip() and not x.strip().startswith('{')), "")
 
                                     linhas = await page.query_selector_all('table#resultadoConsultacarroFiltros tr')
                                     dados_tabela = {}
@@ -296,11 +282,12 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                                 dados_tabela[ultima_label] = valor_coluna
 
                                     dados = {
-                                        "MarcaSelecionada": nome_marca.strip(),
-                                        "ModeloSelecionado": nome_modelo.strip(),
-                                        "AnoSelecionado": nome_ano.strip(),
+                                        "MarcaSelecionada": marca,
+                                        "ModeloSelecionado": modelo,
+                                        "AnoSelecionado": ano_modelo,
                                         "CodigoFipe": codigo_fipe,
                                         "PrecoMedio": preco_medio,
+                                        "Mes Referencia": mes_referencia,
                                         **dados_tabela
                                     }
 
