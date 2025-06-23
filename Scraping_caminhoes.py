@@ -336,4 +336,4 @@ if __name__ == "__main__":
     Fipe_df = pd.DataFrame(Fipe)
     print("\n\nDADOS FINAIS COLETADOS")
     print(Fipe_df)
-    Fipe_df.to_excel("Fipe.xlsx", index=False)
+    Fipe_df.to_excel("Fipe_Caminhoes.xlsx", index=False)

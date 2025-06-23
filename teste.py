@@ -32,6 +32,7 @@ def salvar_marcas_processadas(marcas_processadas):
     with open("marcas_processadas.json", "w") as f:
         json.dump(list(marcas_processadas),f)
 
+# Abre o dropdown/Seleção de itens e deixa aberto um tempo para carregar
 async def abrir_dropdown_e_esperar(page, container_id):
     logging.info(f"Abrindo dropdown: {container_id}")
     await page.focus(f'div.chosen-container#{container_id} > a')
@@ -39,6 +40,7 @@ async def abrir_dropdown_e_esperar(page, container_id):
     await asyncio.sleep(2)
     await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=20000)
 
+# Seleciona o item pelo index dele
 async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
     logging.info(f"Selecionando item {index+1} no dropdown {container_id}")
     await abrir_dropdown_e_esperar(page, container_id)
@@ -96,6 +98,7 @@ async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
         await items[index].click()
         await asyncio.sleep(1)
 
+# A primeira vez que abre alguma seleção escolhe o primeiro item do dropdown
 async def selecionar_primeiro_item_teclado(page, container_id):
     logging.info(f"Selecionando primeiro item via teclado no dropdown {container_id}")
     try:
@@ -117,6 +120,7 @@ async def selecionar_primeiro_item_teclado(page, container_id):
             await page.keyboard.press("Enter")
         await asyncio.sleep(1)
 
+# Clica no botão para limpar a pesquisa apos pegar os dados da tabela
 async def limpar_pesquisa(page):
     try:
         await page.wait_for_selector('#buttonLimparPesquisarcarro a.text', state='visible', timeout=5000)
@@ -143,6 +147,7 @@ async def fechar_todos_dropdowns(page):
     await page.evaluate("document.activeElement.blur();")
     await asyncio.sleep(0.3)
 
+# MAIN
 async def run(max_marcas=None, max_modelos=None, max_anos=None):
     marcas_processadas = carregar_marcas_processadas()
     async with async_playwright() as p:
@@ -308,7 +313,20 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
                                     Fipe.append(dados)
                                     logging.info(f"    Dados salvos no Fipe: {dados}")
-                                    pd.DataFrame(Fipe).to_excel("Fipe_temp.xlsx", index=False)
+                                    
+                                    temp = "Fipe_temp.xlsx"
+                                    fipe_temp_novo = pd.DataFrame([dados])
+                                    if os.path.exists(temp):
+                                        fipe_temp_antigo = pd.read_excel(temp)
+                                        df_completo = pd.concat([fipe_temp_antigo,fipe_temp_novo], ignore_index=True)
+                                        
+                                        # Tirando duplicadas
+                                        df_completo = df_completo.drop_duplicates()
+                                        
+                                    else:
+                                        df_completo = fipe_temp_novo
+                                    
+                                    df_completo.to_excel(temp, index=False)
 
                                 except Exception as e:
                                     logging.warning(f"[ERRO] Ano [{ano_index+1}] do Modelo [{nome_modelo.strip()}]: {e}")
