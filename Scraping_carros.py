@@ -14,14 +14,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 Fipe = []
 
 # Cria json se não houver Log de Marcas
-if not os.path.exists("marcas_processadas.json"):
-    with open("marcas_processadas.json", "w") as f:
+if not os.path.exists("marcas_processadas_carros.json"):
+    with open("marcas_processadas_carros.json", "w") as f:
         json.dump([], f)
 
 # Carrega as Marcas do Json
 def carregar_marcas_processadas():
     try:
-        with open("marcas_processadas.json", "r") as f:
+        with open("marcas_processadas_carros.json", "r") as f:
             return set(json.load(f))
     except Exception as e:
         logging.warning(f"Não foi possivel carregar as marcas processadas {e}")
@@ -29,7 +29,7 @@ def carregar_marcas_processadas():
 
 # Salva as marcas no json
 def salvar_marcas_processadas(marcas_processadas):
-    with open("marcas_processadas.json", "w") as f:
+    with open("marcas_processadas_carros.json", "w") as f:
         json.dump(list(marcas_processadas),f)
 
 async def abrir_dropdown_e_esperar(page, container_id):
@@ -308,7 +308,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
                                     Fipe.append(dados)
                                     logging.info(f"    Dados salvos no Fipe: {dados}")
-                                    pd.DataFrame(Fipe).to_excel("Fipe_temp.xlsx", index=False)
+                                    pd.DataFrame(Fipe).to_excel("Fipe_temp_carros.xlsx", index=False)
 
                                 except Exception as e:
                                     logging.warning(f"[ERRO] Ano [{ano_index+1}] do Modelo [{nome_modelo.strip()}]: {e}")
