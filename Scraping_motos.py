@@ -13,11 +13,22 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 Fipe = []
 
+JSON = "modelos_processados_motos.json"
+
 # Cria json se não houver Log de Marcas
 if not os.path.exists("marcas_processadas_motos.json"):
     with open("marcas_processadas_motos.json", "w") as f:
         json.dump([], f)
 
+# Garante que o arquivo existe
+if not os.path.exists(JSON):
+    with open(JSON, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+# Carrega modelos já processados
+with open(JSON, "r", encoding="utf-8") as f:
+    modelos_processados = json.load(f)
+    
 # Carrega as Marcas do Json
 def carregar_marcas_processadas():
     try:
@@ -32,6 +43,19 @@ def salvar_marcas_processadas(marcas_processadas):
     with open("marcas_processadas_motos.json", "w") as f:
         json.dump(list(marcas_processadas),f)
 
+def carregar_modelos_processados():
+    try:
+        with open("modelos_processados_motos.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logging.warning(f"Erro ao carregar modelos processados: {e}")
+        return {}
+    
+def salvar_modelos_processados(modelos_processados):
+    with open("modelos_processados_carros.json", "w", encoding="utf-8") as f:
+        json.dump(modelos_processados, f, ensure_ascii=False, indent=2)
+        
+# Abre o dropdown/Seleção de itens e deixa aberto um tempo para carregar
 async def abrir_dropdown_e_esperar(page, container_id):
     logging.info(f"Abrindo dropdown: {container_id}")
     await page.focus(f'div.chosen-container#{container_id} > a')
@@ -39,6 +63,7 @@ async def abrir_dropdown_e_esperar(page, container_id):
     await asyncio.sleep(2)
     await page.wait_for_selector(f'div.chosen-container#{container_id} ul.chosen-results > li', state='attached', timeout=20000)
 
+# Seleciona o item pelo index dele
 async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
     logging.info(f"Selecionando item {index+1} no dropdown {container_id}")
     await abrir_dropdown_e_esperar(page, container_id)
@@ -96,6 +121,7 @@ async def selecionar_item_por_index(page, container_id, index, use_arrow=False):
         await items[index].click()
         await asyncio.sleep(1)
 
+# A primeira vez que abre alguma seleção escolhe o primeiro item do dropdown
 async def selecionar_primeiro_item_teclado(page, container_id):
     logging.info(f"Selecionando primeiro item via teclado no dropdown {container_id}")
     try:
@@ -117,6 +143,7 @@ async def selecionar_primeiro_item_teclado(page, container_id):
             await page.keyboard.press("Enter")
         await asyncio.sleep(1)
 
+# Clica no botão para limpar a pesquisa apos pegar os dados da tabela
 async def limpar_pesquisa(page):
     try:
         await page.wait_for_selector('#buttonLimparPesquisarmoto a.text', state='visible', timeout=5000)
@@ -143,8 +170,11 @@ async def fechar_todos_dropdowns(page):
     await page.evaluate("document.activeElement.blur();")
     await asyncio.sleep(0.3)
 
+# MAIN
 async def run(max_marcas=None, max_modelos=None, max_anos=None):
     marcas_processadas = carregar_marcas_processadas()
+    modelos_processados = carregar_modelos_processados()
+    
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
         page = await browser.new_page()
@@ -196,6 +226,9 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                 nome_marcas = await marcas[marca_index].text_content()
                 nome_marca = marcas_lista[marca_index]
                 
+                if nome_marca not in modelos_processados:
+                    modelos_processados[nome_marca] = []
+                
                 if nome_marcas.strip() in marcas_processadas:
                     logging.warning(f"[SKIP] Marca {marca_index+1} já processada. Pulando.")
                     continue
@@ -212,10 +245,27 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                     modelos = await page.query_selector_all('div.chosen-container#selectAnoModelomoto_chosen ul.chosen-results > li')
                     max_modelos_loop = len(modelos) if max_modelos is None else min(max_modelos, len(modelos))
 
-                    for modelo_index in range(max_modelos_loop):
+                    # Determina ponto de retomada para modelos da marca atual
+                    modelos_ja_processados = modelos_processados.get(nome_marca, [])
+                    indice_modelo_inicial = 0
+
+                    for i, modelo in enumerate(modelos):
+                        nome = (await modelo.text_content()).strip()
+                        if modelos_ja_processados and nome == modelos_ja_processados[-1]:
+                            indice_modelo_inicial = i + 1  # começa no próximo modelo
+                            break
+
+                    # Loop principal de modelos com retomada
+                    for modelo_index in range(indice_modelo_inicial, max_modelos_loop):
+
                         try:
-                            nome_modelo = await modelos[modelo_index].text_content()
-                            logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo.strip()}")
+                            
+                            nome_modelo = (await modelos[modelo_index].text_content()).strip()
+                            if nome_modelo in modelos_processados[nome_marca]:
+                                logging.info(f"  [SKIP] Modelo já processado: {nome_modelo}")
+                                continue
+
+                            logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
 
                             await abrir_dropdown_e_esperar(page, "selectAnoModelomoto_chosen")
                             await selecionar_item_por_index(page, "selectAnoModelomoto_chosen", modelo_index, use_arrow=True)
@@ -308,7 +358,24 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
                                     Fipe.append(dados)
                                     logging.info(f"    Dados salvos no Fipe: {dados}")
-                                    pd.DataFrame(Fipe).to_excel("Fipe_temp_motos.xlsx", index=False)
+                                    
+                                    temp = "Fipe_temp_motos.xlsx"
+                                    fipe_temp_novo = pd.DataFrame([dados])
+                                    if os.path.exists(temp):
+                                        fipe_temp_antigo = pd.read_excel(temp)
+                                        df_completo = pd.concat([fipe_temp_antigo,fipe_temp_novo], ignore_index=True)
+                                        
+                                        # Tirando duplicadas
+                                        df_completo = df_completo.drop_duplicates()
+                                        
+                                    else:
+                                        df_completo = fipe_temp_novo
+                                    
+                                    if nome_modelo not in modelos_processados[nome_marca]:
+                                        modelos_processados[nome_marca].append(nome_modelo)
+                                        salvar_modelos_processados(modelos_processados)
+                                    
+                                    df_completo.to_excel(temp, index=False)
 
                                 except Exception as e:
                                     logging.warning(f"[ERRO] Ano [{ano_index+1}] do Modelo [{nome_modelo.strip()}]: {e}")
@@ -336,4 +403,4 @@ if __name__ == "__main__":
     Fipe_df = pd.DataFrame(Fipe)
     print("\n\nDADOS FINAIS COLETADOS")
     print(Fipe_df)
-    Fipe_df.to_excel("Fipe_Motos.xlsx", index=False)
+    Fipe_df.to_excel("Fipe_motos.xlsx", index=False)
