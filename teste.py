@@ -13,11 +13,22 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 Fipe = []
 
+JSON = "modelos_processados_carros.json"
+
 # Cria json se não houver Log de Marcas
 if not os.path.exists("marcas_processadas.json"):
     with open("marcas_processadas.json", "w") as f:
         json.dump([], f)
 
+# Garante que o arquivo existe
+if not os.path.exists(JSON):
+    with open(JSON, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+# Carrega modelos já processados
+with open(JSON, "r", encoding="utf-8") as f:
+    modelos_processados = json.load(f)
+    
 # Carrega as Marcas do Json
 def carregar_marcas_processadas():
     try:
@@ -32,6 +43,18 @@ def salvar_marcas_processadas(marcas_processadas):
     with open("marcas_processadas.json", "w") as f:
         json.dump(list(marcas_processadas),f)
 
+def carregar_modelos_processados():
+    try:
+        with open("modelos_processados_carros.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logging.warning(f"Erro ao carregar modelos processados: {e}")
+        return {}
+    
+def salvar_modelos_processados(modelos_processados):
+    with open("modelos_processados_carros.json", "w", encoding="utf-8") as f:
+        json.dump(modelos_processados, f, ensure_ascii=False, indent=2)
+        
 # Abre o dropdown/Seleção de itens e deixa aberto um tempo para carregar
 async def abrir_dropdown_e_esperar(page, container_id):
     logging.info(f"Abrindo dropdown: {container_id}")
@@ -150,6 +173,8 @@ async def fechar_todos_dropdowns(page):
 # MAIN
 async def run(max_marcas=None, max_modelos=None, max_anos=None):
     marcas_processadas = carregar_marcas_processadas()
+    modelos_processados = carregar_modelos_processados()
+    
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
         page = await browser.new_page()
@@ -201,6 +226,9 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                 nome_marcas = await marcas[marca_index].text_content()
                 nome_marca = marcas_lista[marca_index]
                 
+                if nome_marca not in modelos_processados:
+                    modelos_processados[nome_marca] = []
+                
                 if nome_marcas.strip() in marcas_processadas:
                     logging.warning(f"[SKIP] Marca {marca_index+1} já processada. Pulando.")
                     continue
@@ -217,10 +245,27 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                     modelos = await page.query_selector_all('div.chosen-container#selectAnoModelocarro_chosen ul.chosen-results > li')
                     max_modelos_loop = len(modelos) if max_modelos is None else min(max_modelos, len(modelos))
 
-                    for modelo_index in range(max_modelos_loop):
+                    # Determina ponto de retomada para modelos da marca atual
+                    modelos_ja_processados = modelos_processados.get(nome_marca, [])
+                    indice_modelo_inicial = 0
+
+                    for i, modelo in enumerate(modelos):
+                        nome = (await modelo.text_content()).strip()
+                        if modelos_ja_processados and nome == modelos_ja_processados[-1]:
+                            indice_modelo_inicial = i + 1  # começa no próximo modelo
+                            break
+
+                    # Loop principal de modelos com retomada
+                    for modelo_index in range(indice_modelo_inicial, max_modelos_loop):
+
                         try:
-                            nome_modelo = await modelos[modelo_index].text_content()
-                            logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo.strip()}")
+                            
+                            nome_modelo = (await modelos[modelo_index].text_content()).strip()
+                            if nome_modelo in modelos_processados[nome_marca]:
+                                logging.info(f"  [SKIP] Modelo já processado: {nome_modelo}")
+                                continue
+
+                            logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
 
                             await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                             await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
@@ -325,6 +370,10 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                                         
                                     else:
                                         df_completo = fipe_temp_novo
+                                    
+                                    if nome_modelo not in modelos_processados[nome_marca]:
+                                        modelos_processados[nome_marca].append(nome_modelo)
+                                        salvar_modelos_processados(modelos_processados)
                                     
                                     df_completo.to_excel(temp, index=False)
 
