@@ -1,0 +1,8 @@
+Código de Teste refeito para testar 
+
+ -> Implementado nova função de como deve se comportar a coleta de dados como referencia para a nova forma de "otimização" que eu pensei de colocar para separar em 3 lotes as 102 marcas e assim colocar para pegar 3 marcas de uma vez simultaneamente.
+
+ -> Agora testar apara ver se funciona 
+
+ -> Ainda falta testar se funciona os código feitos para motos e caminhões
+ 
