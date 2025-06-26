@@ -6,6 +6,7 @@ import logging
 from tqdm import tqdm
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 import json
+from asyncio import Queue
 
 # Configura encoding e logging
 sys.stdout.reconfigure(encoding='utf-8')
@@ -169,6 +170,26 @@ async def fechar_todos_dropdowns(page):
     await page.evaluate("document.activeElement.blur();")
     await asyncio.sleep(0.3)
 
+async def worker(queue, browser_context, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos):
+    while not queue.empty():
+        marca_index = await queue.get()
+        page = await browser_context.new_page()
+        try:
+            await processar_marca(
+                page,
+                marca_index,
+                marcas_lista,
+                modelos_processados,
+                marcas_processadas,
+                max_modelos,
+                max_anos
+            )
+        except Exception as e:
+            logging.error(f"[ERRO NO WORKER - Marca {marca_index+1}]: {e}")
+        finally:
+            await page.close()
+            queue.task_done()
+
 # Função para processar uma única marca
 async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos):
     
@@ -192,7 +213,10 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
         await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
         modelos = await page.query_selector_all('div.chosen-container#selectAnoModelocarro_chosen ul.chosen-results > li')
         max_modelos_loop = len(modelos) if max_modelos is None else min(max_modelos, len(modelos))
-
+        
+        if nome_marca not in modelos_processados:
+            modelos_processados[nome_marca] = []
+                    
         # Determina ponto de retomada para modelos da marca atual
         modelos_ja_processados = modelos_processados.get(nome_marca, [])
         indice_modelo_inicial = 0
@@ -341,7 +365,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
     salvar_marcas_processadas(marcas_processadas)
 
 # Função principal modificada para processar 3 marcas em paralelo
-async def run(max_marcas=None, max_modelos=None, max_anos=None):
+async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
     marcas_processadas = carregar_marcas_processadas()
     modelos_processados = carregar_modelos_processados()
 
@@ -350,62 +374,49 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
         context = await browser.new_context()
 
         try:
-            # Inicializa a página para obter a lista de marcas
+            # Abre página inicial só para pegar as marcas
             page = await context.new_page()
             logging.info("Acessando o site da FIPE...")
             await page.goto('https://veiculos.fipe.org.br/', timeout=120000)
-
-            logging.info("Clicando em 'Consulta de Carros e Utilitários Pequenos'...")
-            await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', state='visible', timeout=30000)
+            await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', timeout=30000)
             await page.click('li:has-text("Carros e utilitários pequenos")')
-
             logging.info("Selecionando Tabela de Referência...")
             await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
             await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")
 
             logging.info("Aguardando carregamento de Marcas...")
             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-            elementos_marcas = await page.query_selector_all('div.chosen-container#selectMarcacarro_chosen ul.chosen-results > li')
-            marcas_nomes = [await m.text_content() for m in elementos_marcas]
-            marcas_nomes = [m.strip() for m in marcas_nomes]
+            marcas = await page.query_selector_all('div.chosen-container#selectMarcacarro_chosen ul.chosen-results > li')
+            marcas_lista = [await m.text_content() for m in marcas]
+            marcas_lista = [m.strip() for m in marcas_lista]
+            await page.close()
 
-            logging.warning(f"[VERIFICAÇÃO] Total de marcas mapeadas: {len(marcas_nomes)}")
-            for i, nome in enumerate(marcas_nomes):
-                logging.warning(f"Marca: [{1+i}]: {nome}")
+            logging.warning(f"[VERIFICAÇÃO] Total de marcas mapeadas: {len(marcas_lista)}")
+            for i, nome in enumerate(marcas_lista):
+                logging.warning(f"Marca: [{i+1}]: {nome}")
 
-            max_marcas = len(marcas_nomes) if max_marcas is None else min(max_marcas, len(marcas_nomes))
+            max_marcas = len(marcas_lista) if max_marcas is None else min(max_marcas, len(marcas_lista))
 
-            await page.close()  # Fecha a página inicial após coletar as marcas
+            # Fila dinâmica com as marcas
+            queue = Queue()
+            for i in range(max_marcas):
+                await queue.put(i)
 
-            # Divide as marcas em grupos de até 3
-            for i in tqdm(range(0, max_marcas, 3), desc="Grupos de Marcas"):
-                grupo_marcas = list(range(i, min(i + 3, max_marcas)))
-                tasks = []
-                pages = []
+            # Cria os workers (navegadores paralelos)
+            tasks = [
+                asyncio.create_task(worker(queue, context, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos))
+                for _ in range(max_workers)
+            ]
 
-                # Cria uma nova página para cada marca no grupo
-                for marca_index in grupo_marcas:
-                    page = await context.new_page()
-                    pages.append(page)
-                    task = asyncio.create_task(
-                        processar_marca(
-                            page, marca_index, marcas_nomes, modelos_processados, 
-                            marcas_processadas, max_modelos, max_anos
-                        )
-                    )
-                    tasks.append(task)
-
-                # Aguarda a conclusão do grupo de marcas
-                await asyncio.gather(*tasks, return_exceptions=True)
-
-                # Fecha as páginas do grupo
-                for page in pages:
-                    await page.close()
+            await queue.join()  # Espera todos os workers finalizarem a fila
+            for task in tasks:
+                task.cancel()  # Cancela workers depois da fila esvaziar
 
         except Exception as e:
             logging.error(f"[ERRO GERAL]: {e}")
         finally:
             await browser.close()
+
 
 if __name__ == "__main__":
     asyncio.run(run(max_marcas=None, max_modelos=None, max_anos=None))
