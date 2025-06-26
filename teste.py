@@ -14,10 +14,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 Fipe = []
 
-JSON = "modelos_processados_carros_teste.json"
+JSON = "modelos_processados_carros.json"
 
 # Cria json se não houver Log de Marcas
-if not os.path.exists("marcas_processadas_teste.json"):
+if not os.path.exists("marcas_processadas.json"):
     with open("marcas_processadas_teste.json", "w") as f:
         json.dump([], f)
 
@@ -33,7 +33,7 @@ with open(JSON, "r", encoding="utf-8") as f:
 # Carrega as Marcas do Json
 def carregar_marcas_processadas():
     try:
-        with open("marcas_processadas_teste.json", "r") as f:
+        with open("marcas_processadas.json", "r") as f:
             return set(json.load(f))
     except Exception as e:
         logging.warning(f"Não foi possivel carregar as marcas processadas {e}")
@@ -41,19 +41,19 @@ def carregar_marcas_processadas():
 
 # Salva as marcas no json
 def salvar_marcas_processadas(marcas_processadas):
-    with open("marcas_processadas_teste.json", "w") as f:
+    with open("marcas_processadas.json", "w") as f:
         json.dump(list(marcas_processadas), f)
 
 def carregar_modelos_processados():
     try:
-        with open("modelos_processados_carros_teste.json", "r", encoding="utf-8") as f:
+        with open("modelos_processados_carros.json", "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logging.warning(f"Erro ao carregar modelos processados: {e}")
         return {}
 
 def salvar_modelos_processados(modelos_processados):
-    with open("modelos_processados_carros_teste.json", "w", encoding="utf-8") as f:
+    with open("modelos_processados_carros.json", "w", encoding="utf-8") as f:
         json.dump(modelos_processados, f, ensure_ascii=False, indent=2)
 
 # Abre o dropdown/Seleção de itens e deixa aberto um tempo para carregar
@@ -324,7 +324,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
 
                         logging.info(f"Dados salvos no Fipe: {dados}")
 
-                        temp = "Fipe_temp_teste.xlsx"
+                        temp = "Fipe_temp.xlsx"
                         fipe_temp_novo = pd.DataFrame([dados])
                         if os.path.exists(temp):
                             fipe_temp_antigo = pd.read_excel(temp)
@@ -424,4 +424,4 @@ if __name__ == "__main__":
     Fipe_df = pd.DataFrame(Fipe)
     print("\n\nDADOS FINAIS COLETADOS")
     print(Fipe_df)
-    Fipe_df.to_excel("Fipe_teste.xlsx", index=False)
+    Fipe_df.to_excel("Fipe.xlsx", index=False)
