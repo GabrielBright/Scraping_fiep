@@ -13,11 +13,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 Fipe = []
 
-JSON = "modelos_processados_carros.json"
+JSON = "modelos_processados_carros_teste.json"
 
 # Cria json se não houver Log de Marcas
-if not os.path.exists("marcas_processadas.json"):
-    with open("marcas_processadas.json", "w") as f:
+if not os.path.exists("marcas_processadas_teste.json"):
+    with open("marcas_processadas_teste.json", "w") as f:
         json.dump([], f)
 
 # Garante que o arquivo existe
@@ -32,7 +32,7 @@ with open(JSON, "r", encoding="utf-8") as f:
 # Carrega as Marcas do Json
 def carregar_marcas_processadas():
     try:
-        with open("marcas_processadas.json", "r") as f:
+        with open("marcas_processadas_teste.json", "r") as f:
             return set(json.load(f))
     except Exception as e:
         logging.warning(f"Não foi possivel carregar as marcas processadas {e}")
@@ -40,19 +40,19 @@ def carregar_marcas_processadas():
 
 # Salva as marcas no json
 def salvar_marcas_processadas(marcas_processadas):
-    with open("marcas_processadas.json", "w") as f:
+    with open("marcas_processadas_teste.json", "w") as f:
         json.dump(list(marcas_processadas), f)
 
 def carregar_modelos_processados():
     try:
-        with open("modelos_processados_carros.json", "r", encoding="utf-8") as f:
+        with open("modelos_processados_carros_teste.json", "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logging.warning(f"Erro ao carregar modelos processados: {e}")
         return {}
 
 def salvar_modelos_processados(modelos_processados):
-    with open("modelos_processados_carros.json", "w", encoding="utf-8") as f:
+    with open("modelos_processados_carros_teste.json", "w", encoding="utf-8") as f:
         json.dump(modelos_processados, f, ensure_ascii=False, indent=2)
 
 # Abre o dropdown/Seleção de itens e deixa aberto um tempo para carregar
@@ -170,10 +170,21 @@ async def fechar_todos_dropdowns(page):
     await asyncio.sleep(0.3)
 
 # Função para processar uma única marca
-async def processar_marca(page, marca_index, marcas, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos):
-    logging.info(f"Processando Marca [{marca_index+1}]: {marcas_lista[marca_index].strip()}")
+async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos):
+    
+    nome_marca = marcas_nomes[marca_index]
+    logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca}")
 
     try:
+        await page.goto('https://veiculos.fipe.org.br/', timeout=120000)
+
+        await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', timeout=30000)
+        await page.click('li:has-text("Carros e utilitários pequenos")')
+
+        await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
+        await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")
+
+        
         await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
         await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
 
@@ -183,7 +194,7 @@ async def processar_marca(page, marca_index, marcas, marcas_lista, modelos_proce
         max_modelos_loop = len(modelos) if max_modelos is None else min(max_modelos, len(modelos))
 
         # Determina ponto de retomada para modelos da marca atual
-        modelos_ja_processados = modelos_processados.get(marcas_lista[marca_index], [])
+        modelos_ja_processados = modelos_processados.get(nome_marca, [])
         indice_modelo_inicial = 0
 
         for i, modelo in enumerate(modelos):
@@ -196,7 +207,7 @@ async def processar_marca(page, marca_index, marcas, marcas_lista, modelos_proce
         for modelo_index in range(indice_modelo_inicial, max_modelos_loop):
             try:
                 nome_modelo = (await modelos[modelo_index].text_content()).strip()
-                if nome_modelo in modelos_processados[marcas_lista[marca_index]]:
+                if nome_modelo in modelos_processados[nome_marca]:
                     logging.info(f"  [SKIP] Modelo já processado: {nome_modelo}")
                     continue
 
@@ -289,7 +300,7 @@ async def processar_marca(page, marca_index, marcas, marcas_lista, modelos_proce
 
                         logging.info(f"Dados salvos no Fipe: {dados}")
 
-                        temp = "Fipe_temp.xlsx"
+                        temp = "Fipe_temp_teste.xlsx"
                         fipe_temp_novo = pd.DataFrame([dados])
                         if os.path.exists(temp):
                             fipe_temp_antigo = pd.read_excel(temp)
@@ -297,9 +308,12 @@ async def processar_marca(page, marca_index, marcas, marcas_lista, modelos_proce
                             df_completo = df_completo.drop_duplicates()
                         else:
                             df_completo = fipe_temp_novo
-
-                        if nome_modelo not in modelos_processados[marcas_lista[marca_index]]:
-                            modelos_processados[marcas_lista[marca_index]].append(nome_modelo)
+                        
+                        if nome_marca not in modelos_processados:
+                            modelos_processados[nome_marca] = []
+                        
+                        if nome_modelo not in modelos_processados[nome_marca]:
+                            modelos_processados[nome_marca].append(nome_modelo)
                             salvar_modelos_processados(modelos_processados)
 
                         df_completo.to_excel(temp, index=False)
@@ -316,12 +330,15 @@ async def processar_marca(page, marca_index, marcas, marcas_lista, modelos_proce
                 await limpar_pesquisa(page)
                 await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
                 await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
-                marcas_processadas.add(marcas_lista[marca_index].strip())
+                marcas_processadas.add(nome_marca.strip())
                 salvar_marcas_processadas(marcas_processadas)
 
     except Exception as e:
         logging.warning(f"[ERRO] Marca [{marca_index+1}]: {e}")
         await asyncio.sleep(2)
+    
+    marcas_processadas.add(nome_marca.strip())
+    salvar_marcas_processadas(marcas_processadas)
 
 # Função principal modificada para processar 3 marcas em paralelo
 async def run(max_marcas=None, max_modelos=None, max_anos=None):
@@ -348,16 +365,15 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
 
             logging.info("Aguardando carregamento de Marcas...")
             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-            marcas = await page.query_selector_all('div.chosen-container#selectMarcacarro_chosen ul.chosen-results > li')
+            elementos_marcas = await page.query_selector_all('div.chosen-container#selectMarcacarro_chosen ul.chosen-results > li')
+            marcas_nomes = [await m.text_content() for m in elementos_marcas]
+            marcas_nomes = [m.strip() for m in marcas_nomes]
 
-            marcas_lista = [await m.text_content() for m in marcas]
-            marcas_lista = [m.strip() for m in marcas_lista]
-
-            logging.warning(f"[VERIFICAÇÃO] Total de marcas mapeadas: {len(marcas_lista)}")
-            for i, nome in enumerate(marcas_lista):
+            logging.warning(f"[VERIFICAÇÃO] Total de marcas mapeadas: {len(marcas_nomes)}")
+            for i, nome in enumerate(marcas_nomes):
                 logging.warning(f"Marca: [{1+i}]: {nome}")
 
-            max_marcas = len(marcas) if max_marcas is None else min(max_marcas, len(marcas))
+            max_marcas = len(marcas_nomes) if max_marcas is None else min(max_marcas, len(marcas_nomes))
 
             await page.close()  # Fecha a página inicial após coletar as marcas
 
@@ -373,7 +389,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
                     pages.append(page)
                     task = asyncio.create_task(
                         processar_marca(
-                            page, marca_index, marcas, marcas_lista, modelos_processados, 
+                            page, marca_index, marcas_nomes, modelos_processados, 
                             marcas_processadas, max_modelos, max_anos
                         )
                     )
@@ -397,4 +413,4 @@ if __name__ == "__main__":
     Fipe_df = pd.DataFrame(Fipe)
     print("\n\nDADOS FINAIS COLETADOS")
     print(Fipe_df)
-    Fipe_df.to_excel("Fipe.xlsx", index=False)
+    Fipe_df.to_excel("Fipe_teste.xlsx", index=False)

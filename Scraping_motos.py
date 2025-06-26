@@ -52,7 +52,7 @@ def carregar_modelos_processados():
         return {}
     
 def salvar_modelos_processados(modelos_processados):
-    with open("modelos_processados_carros.json", "w", encoding="utf-8") as f:
+    with open("modelos_processados_motos.json", "w", encoding="utf-8") as f:
         json.dump(modelos_processados, f, ensure_ascii=False, indent=2)
         
 # Abre o dropdown/Seleção de itens e deixa aberto um tempo para carregar
