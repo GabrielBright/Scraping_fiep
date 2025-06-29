@@ -1,4 +1,4 @@
 Código Simultanea funcionando corretamente 
 
- -> Amanhã colocar para pegar de onde parou usando o oficial ou testar para pegar caminhões e já pega ele e motos mais acho melhor pegar o de carros primeiro.
+ -> Fazer uma função que verifica se todos os modelos de determinada marca foram pegos para não deixar nenhum dado faltando.
  

@@ -370,7 +370,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
     modelos_processados = carregar_modelos_processados()
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        browser = await p.chromium.launch()
         context = await browser.new_context()
 
         try:
