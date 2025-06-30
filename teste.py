@@ -397,7 +397,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
     salvar_marcas_processadas(marcas_processadas)
 
 # Função principal modificada para processar 3 marcas em paralelo
-async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
+async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=4):
     marcas_processadas = carregar_marcas_processadas()
     modelos_processados = carregar_modelos_processados()
 

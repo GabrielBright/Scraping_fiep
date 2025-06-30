@@ -671,7 +671,12 @@
     "X6 M Competition 4.4 V8 BI-TB 625CV Aut.",
     "X6 XDRIVE 35i 3.0 306cv Bi-Turbo",
     "X6 XDRIVE 40i Bl.Vermillion 3.0 Bi-Turbo",
-    "X6 XDRIVE 40i M Sport 3.0 Bi-TB (Hib.)"
+    "X6 XDRIVE 40i M Sport 3.0 Bi-TB (Hib.)",
+    "X6 XDRIVE 40i M Sport 3.0 Bi-Turbo",
+    "X6 XDRIVE 50i 4.4 407cv Bi-Turbo",
+    "X6 XDRIVE 50i M Sport 4.4 Bi-Turbo",
+    "X7 M50i 4.4 V8 Bi-TB Aut.",
+    "X7 M50i Dark Shadow 4.4 V8 Bi-TB Aut."
   ],
   "Baby": [
     "Buggy 1.6 2-Lug.",
@@ -1048,7 +1053,9 @@
     "Xsara GLX/ Paris 2.0 16V",
     "Xsara Picasso Exc./Etoile 2.0 16V Mec.",
     "Xsara Picasso Exclus. 1.6/ 1.6 Flex 16V",
-    "Xsara Picasso Exclusive 2.0 16V Aut."
+    "Xsara Picasso Exclusive 2.0 16V Aut.",
+    "Xsara Picasso GLX 1.6/ 1.6 Flex 16V",
+    "Xsara Picasso GLX 2.0 16V  Aut."
   ],
   "Cross Lander": [
     "CL-244 2.8 132cv 4x4 TB Int. Diesel",
@@ -1322,7 +1329,11 @@
     "Ducato Maxi. Curta 2.3 T.Alto ME Diesel",
     "Ducato Maxi. Long. 2.3 T.Alto ME Diesel",
     "Ducato MaxiCargo 2.2 Diesel (E6)",
-    "Ducato MaxiCargo 2.3 16V Diesel"
+    "Ducato MaxiCargo 2.3 16V Diesel",
+    "Ducato MaxiCargo/Furgão Maxi 2.8 TB Dies",
+    "Ducato MaxiMulti 2.3 16V Diesel",
+    "Ducato Minibus 2.2 Comf.19L Diesel (E6)",
+    "Ducato Minibus 2.2 Exec. 17L Diesel (E6)"
   ],
   "Honda": [
     "Accord Coupe EX",
