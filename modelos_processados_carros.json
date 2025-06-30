@@ -661,7 +661,17 @@
     "X5 XDRIVE 45e 3.0 M.Sport  Aut. (Híb.)",
     "X5 XDRIVE 50e 3.0 M Sport Aut. (Hibrido)",
     "X5 XDRIVE 50e 3.0 X-Line Aut. (Hibrido)",
-    "X5 XDRIVE 50i 4.4  Bi-Turbo"
+    "X5 XDRIVE 50i 4.4  Bi-Turbo",
+    "X5 XDRIVE 50i M Sport 4.4 Bi-Turbo",
+    "X5 XDRIVE 50i Security 4.4 Bi-Turbo",
+    "X5 XDRIVE M50d 3.0 Diesel",
+    "X5 XDRIVE M50i 4.4 Bi-Turbo Aut.",
+    "X6 M 4.4 4x4 V8 32V Bi-Turbo Aut.",
+    "X6 M Competition 4.4 V8 BI-TB (Hib) Aut.",
+    "X6 M Competition 4.4 V8 BI-TB 625CV Aut.",
+    "X6 XDRIVE 35i 3.0 306cv Bi-Turbo",
+    "X6 XDRIVE 40i Bl.Vermillion 3.0 Bi-Turbo",
+    "X6 XDRIVE 40i M Sport 3.0 Bi-TB (Hib.)"
   ],
   "Baby": [
     "Buggy 1.6 2-Lug.",
@@ -1026,7 +1036,19 @@
     "Xsara Exclusive 1.6 16V 5p Aut.",
     "Xsara Exclusive 1.6 16V 5p Mec.",
     "Xsara Exclusive 1.8 8V/16V 5p Aut.",
-    "Xsara Exclusive 1.8 8V/16V 5p Mec."
+    "Xsara Exclusive 1.8 8V/16V 5p Mec.",
+    "Xsara Exclusive 2.0 16V",
+    "Xsara GLX 1.6 16V 3p",
+    "Xsara GLX 1.6 16V 5p Aut.",
+    "Xsara GLX 1.6 16V 5p Mec.",
+    "Xsara GLX 1.8 16V 5p Mec.",
+    "Xsara GLX 1.8 16V Cupê Mec.",
+    "Xsara GLX 1.8 8V 5p Aut.",
+    "Xsara GLX 1.8 8V Cupê Aut.",
+    "Xsara GLX/ Paris 2.0 16V",
+    "Xsara Picasso Exc./Etoile 2.0 16V Mec.",
+    "Xsara Picasso Exclus. 1.6/ 1.6 Flex 16V",
+    "Xsara Picasso Exclusive 2.0 16V Aut."
   ],
   "Cross Lander": [
     "CL-244 2.8 132cv 4x4 TB Int. Diesel",
@@ -1288,7 +1310,19 @@
     "Ducato Cargo 2.2 Diesel (E6)",
     "Ducato Cargo 2.8 Curto/Longo TB Diesel",
     "Ducato Cargo Curto 2.3 16V Diesel",
-    "Ducato Cargo Curto 2.3 ME Diesel"
+    "Ducato Cargo Curto 2.3 ME Diesel",
+    "Ducato Cargo Longo 2.3 ME Diesel",
+    "Ducato Cargo Médio 2.3 16V Diesel",
+    "Ducato Chassi 2.3 16V Diesel",
+    "Ducato Combinato 2.3 ME Diesel",
+    "Ducato Combinato 2.8 Diesel",
+    "Ducato Combinato 2.8 Turbo Diesel",
+    "Ducato Executivo 2.3 16V Diesel",
+    "Ducato Furgão Maxi 2.8 Diesel",
+    "Ducato Maxi. Curta 2.3 T.Alto ME Diesel",
+    "Ducato Maxi. Long. 2.3 T.Alto ME Diesel",
+    "Ducato MaxiCargo 2.2 Diesel (E6)",
+    "Ducato MaxiCargo 2.3 16V Diesel"
   ],
   "Honda": [
     "Accord Coupe EX",
