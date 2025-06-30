@@ -44,6 +44,7 @@ def salvar_marcas_processadas(marcas_processadas):
     with open("marcas_processadas.json", "w") as f:
         json.dump(list(marcas_processadas), f)
 
+# Serve para carregar os modelos pegos do arquivo JSON
 def carregar_modelos_processados():
     try:
         with open("modelos_processados_carros.json", "r", encoding="utf-8") as f:
@@ -52,6 +53,7 @@ def carregar_modelos_processados():
         logging.warning(f"Erro ao carregar modelos processados: {e}")
         return {}
 
+# Salva após coletar todos os anos modelos de determinado modelo
 def salvar_modelos_processados(modelos_processados):
     with open("modelos_processados_carros.json", "w", encoding="utf-8") as f:
         json.dump(modelos_processados, f, ensure_ascii=False, indent=2)
@@ -164,12 +166,14 @@ async def limpar_pesquisa(page):
     except Exception as e:
         logging.warning(f"[ERRO ao tentar limpar pesquisa]: {e}")
 
+# Função deita para facilitar e limpar o código
 async def fechar_todos_dropdowns(page):
     await page.keyboard.press("Escape")
     await asyncio.sleep(0.3)
     await page.evaluate("document.activeElement.blur();")
     await asyncio.sleep(0.3)
 
+# Para conseguir processar em multiplas abas o SCRAPING
 async def worker(queue, browser_context, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos):
     while not queue.empty():
         marca_index = await queue.get()
@@ -190,7 +194,7 @@ async def worker(queue, browser_context, marcas_lista, modelos_processados, marc
             await page.close()
             queue.task_done()
 
-# Função para processar uma única marca
+# Função para processar marca, ou seja, como cada aba vai processar a coleta de dados
 async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos):
     
     nome_marca = marcas_nomes[marca_index]
@@ -212,33 +216,58 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
         logging.info("Aguardando carregamento de Modelos...")
         await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
         modelos = await page.query_selector_all('div.chosen-container#selectAnoModelocarro_chosen ul.chosen-results > li')
-        max_modelos_loop = len(modelos) if max_modelos is None else min(max_modelos, len(modelos))
+        modelos_nomes = [ (await m.text_content()).strip() for m in modelos ]
+        max_modelos_loop = len(modelos_nomes) if max_modelos is None else min(max_modelos, len(modelos_nomes))
+
+        # Verificação rápida: se o último modelo já está no JSON, considera tudo processado
+        ultimo_modelo_disponivel = modelos_nomes[max_modelos_loop - 1] if max_modelos_loop > 0 else None
+        modelos_ja_processados = modelos_processados.get(nome_marca, [])
+
+        if ultimo_modelo_disponivel and ultimo_modelo_disponivel in modelos_ja_processados:
+            logging.info(f"[SKIP] Todos os modelos da marca {nome_marca} já foram processados. Pulando...")
+            marcas_processadas.add(nome_marca.strip())
+            salvar_marcas_processadas(marcas_processadas)
+            return
         
         if nome_marca not in modelos_processados:
             modelos_processados[nome_marca] = []
-                    
-        # Determina ponto de retomada para modelos da marca atual
+        
         modelos_ja_processados = modelos_processados.get(nome_marca, [])
+
         indice_modelo_inicial = 0
+        if modelos_processados[nome_marca]:
+            ultimo_modelo_salvo = modelos_processados[nome_marca][-1]
+            try:
+                indice_modelo_inicial = modelos_nomes.index(ultimo_modelo_salvo) + 1
+                logging.info(f"[RETOMADA] Continuando do modelo '{ultimo_modelo_salvo}' (índice {indice_modelo_inicial})")
+            except ValueError:
+                logging.warning(f"[RETOMADA] Último modelo '{ultimo_modelo_salvo}' não encontrado. Recomeçando do início.")
 
-        for i, modelo in enumerate(modelos):
-            nome = (await modelo.text_content()).strip()
-            if modelos_ja_processados and nome == modelos_ja_processados[-1]:
-                indice_modelo_inicial = i + 1
-                break
-
-        # Loop principal de modelos com retomada
+        # Determina ponto de retomada para modelos da marca atual
         for modelo_index in range(indice_modelo_inicial, max_modelos_loop):
             try:
                 nome_modelo = (await modelos[modelo_index].text_content()).strip()
-                if nome_modelo in modelos_processados[nome_marca]:
-                    logging.info(f"  [SKIP] Modelo já processado: {nome_modelo}")
-                    continue
-
+                
                 logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
-
                 await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                 await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
+                await asyncio.sleep(0.5)
+
+                # Verifica se o modelo foi realmente selecionado
+                modelo_selecionado = await page.locator('#selectAnoModelocarro_chosen span').inner_text()
+                if nome_modelo not in modelo_selecionado:
+                    logging.warning(f"[AVISO] Falha ao selecionar o modelo {nome_modelo}, tentando resetar dropdowns...")
+                    # Refaz a seleção completa
+                    await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+                    await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+                    await page.keyboard.press("Escape")
+                    await asyncio.sleep(0.3)
+
+                    await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+                    await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
+                    await page.keyboard.press("Escape")
+                    await asyncio.sleep(0.3)
+
 
                 await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
                 anos = await page.query_selector_all('div.chosen-container#selectAnocarro_chosen ul.chosen-results > li')
@@ -356,6 +385,9 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                 await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
                 marcas_processadas.add(nome_marca.strip())
                 salvar_marcas_processadas(marcas_processadas)
+                
+        # Loga que terminou a marca e quantos modelos foram processados
+        logging.info(f"[CONCLUÍDO] Marca {nome_marca}: {len(modelos_processados[nome_marca])} modelos processados.")
 
     except Exception as e:
         logging.warning(f"[ERRO] Marca [{marca_index+1}]: {e}")
@@ -416,7 +448,6 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
             logging.error(f"[ERRO GERAL]: {e}")
         finally:
             await browser.close()
-
 
 if __name__ == "__main__":
     asyncio.run(run(max_marcas=None, max_modelos=None, max_anos=None))

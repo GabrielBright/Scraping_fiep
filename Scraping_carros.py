@@ -205,7 +205,6 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
         await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
         await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")
 
-        
         await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
         await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
 
