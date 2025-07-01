@@ -202,7 +202,7 @@ async def inicializaAPagina(page):
     await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
     await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")
     
-async def processar_ano(page, marca_index, modelo_index, ano_index, anos, nome_marca, nome_modelo, modelos_processados):
+async def processar_ano(page, ano_index, anos, nome_marca, nome_modelo, modelos_processados, dados_coletados):
     try:
         nome_ano = (await anos[ano_index].text_content()).strip()
         logging.info(f"    Ano [{ano_index+1}]: {nome_ano}")
@@ -256,18 +256,8 @@ async def processar_ano(page, marca_index, modelo_index, ano_index, anos, nome_m
             "Mes Referencia": mes_referencia,
             **dados_tabela
         }
-
-        logging.info(f"Dados salvos: {dados}")
-
-        # Salva no Excel temporário
-        temp = "Fipe_temp.xlsx"
-        fipe_temp_novo = pd.DataFrame([dados])
-        if os.path.exists(temp):
-            fipe_temp_antigo = pd.read_excel(temp)
-            df_completo = pd.concat([fipe_temp_antigo, fipe_temp_novo], ignore_index=True)
-            df_completo = df_completo.drop_duplicates()
-        else:
-            df_completo = fipe_temp_novo
+        
+        dados_coletados.append(dados)
 
         # Atualiza modelos processados
         if nome_modelo not in modelos_processados[nome_marca]:
@@ -278,6 +268,9 @@ async def processar_ano(page, marca_index, modelo_index, ano_index, anos, nome_m
         logging.warning(f"[ERRO] Ano [{ano_index+1}] do Modelo [{nome_modelo}]: {e}")
         
 async def processar_modelo(page, marca_index, modelo_index, modelos_nomes, nome_marca, modelos_processados, max_anos):
+    
+    dados_coletados = []
+    
     try:
         nome_modelo = modelos_nomes[modelo_index]
         if nome_modelo in modelos_processados.get(nome_marca, []):
@@ -312,6 +305,18 @@ async def processar_modelo(page, marca_index, modelo_index, modelos_nomes, nome_
                 await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
             await processar_ano(page, marca_index, modelo_index, ano_index, anos, nome_marca, nome_modelo, modelos_processados)
 
+        # Salva todos os dados quando termina um modelo 
+        if dados_coletados:
+            temp = "Fipe_temp.xlsx"
+            fipe_temp_novo = pd.DataFrame(dados_coletados) 
+            if os.path.exists(temp):
+                fipe_temp_antigo = pd.read_excel(temp)
+                df_completo = pd.concat([fipe_temp_antigo, fipe_temp_novo], ignore_index=True).drop_duplicates()
+            else:
+                df_completo = fipe_temp_novo
+            df_completo.to_excel(temp, index=False)
+            logging.info(f"[SALVO] Dados de {len(dados_coletados)} anos do modelo {nome_modelo} salvos em {temp}")
+        
     except Exception as e:
         logging.warning(f"[ERRO] Modelo [{modelo_index+1}]: {e}")
 
@@ -320,7 +325,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
     
     nome_marca = marcas_nomes[marca_index]
     logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca}")
-
+    
     try:
         await inicializaAPagina(page)
         await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
