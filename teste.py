@@ -304,6 +304,16 @@ async def processar_modelo(page, marca_index, modelo_index, modelos_nomes, nome_
                 await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                 await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
             await processar_ano(page, marca_index, modelo_index, ano_index, anos, nome_marca, nome_modelo, modelos_processados)
+        
+            await processar_ano(
+                page,
+                ano_index,
+                anos,
+                nome_marca,
+                nome_modelo,
+                modelos_processados,
+                dados_coletados
+            )
 
         # Salva todos os dados quando termina um modelo 
         if dados_coletados:

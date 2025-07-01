@@ -1396,7 +1396,8 @@
     "Fiorino Endurance 1.3 Flex 8V 2p",
     "Fiorino Endurance EVO 1.4 Flex 8V 2p",
     "Fiorino Furg.1.5/1.3/1.3 Fire/1.3 F.Flex",
-    "Fiorino Furgão 1.0"
+    "Fiorino Furgão 1.0",
+    "Fiorino Furgão 1.5 mpi / i.e."
   ],
   "Honda": [
     "Accord Coupe EX",
@@ -2288,7 +2289,12 @@
     "EcoSport FREESTYLE 1.6 16V Flex 5p",
     "EcoSport FREESTYLE 1.6 16V Flex 5p Aut.",
     "EcoSport FREESTYLE 2.0 16V 4WD Flex 5p",
-    "EcoSport FREESTYLE 2.0 16V Flex 5p"
+    "EcoSport FREESTYLE 2.0 16V Flex 5p",
+    "EcoSport FREESTYLE 2.0 16V Flex 5p Aut.",
+    "EcoSport FREESTYLE PLUS 1.5 Flex 5p Aut.",
+    "EcoSport S 1.6 16V Flex 5p",
+    "EcoSport SE 1.5 12V Flex 5p Aut.",
+    "EcoSport SE 1.5 12V Flex 5p Mec."
   ],
   "FOTON": [
     "AUMARK 3.5 - 11DT 2.8 4x2 TB Diesel",
@@ -2334,6 +2340,13 @@
     "A-20 Custom/ C-20 S 4.1",
     "AGILE LT 1.4 MPFI 8V FlexPower 5p",
     "AGILE LTZ 1.4 MPFI 8V FlexPower 5p",
-    "AGILE LTZ EASYTRONIC 1.4 8V FlexPower 5p"
+    "AGILE LTZ EASYTRONIC 1.4 8V FlexPower 5p",
+    "AGILE LTZ EFFECT 1.4 8V FlexPower 5p Mec",
+    "AGILE LTZ EFFECT EASYTR.1.4 8V FlexP. 5p",
+    "AGILE LTZ WI-FI 1.4 8V FlexPower 5p",
+    "Astra 2.0 8V/ CD 2.0 8V Hatchback 5p Aut",
+    "Astra 2.0 8V/ CD 2.0 8V Hatchback 5p Mec",
+    "Astra 2.0/ CD 2.0 8V 3p Aut.",
+    "Astra 2.0/ CD/ GLS 2.0 MPFI 16V 3p"
   ]
 }
