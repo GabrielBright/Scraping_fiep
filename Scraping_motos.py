@@ -203,7 +203,6 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
 
         await abrir_dropdown_e_esperar(page, "selectTabelaReferenciamoto_chosen")
         await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciamoto_chosen")
-
         
         await abrir_dropdown_e_esperar(page, "selectMarcamoto_chosen")
         await selecionar_item_por_index(page, "selectMarcamoto_chosen", marca_index, use_arrow=True)
@@ -211,10 +210,29 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
         logging.info("Aguardando carregamento de Modelos...")
         await abrir_dropdown_e_esperar(page, "selectAnoModelomoto_chosen")
         modelos = await page.query_selector_all('div.chosen-container#selectAnoModelomoto_chosen ul.chosen-results > li')
+        modelos_nomes = [ (await m.text_content()).strip() for m in modelos ]
         max_modelos_loop = len(modelos) if max_modelos is None else min(max_modelos, len(modelos))
+        
+        # Verificação rápida: se o último modelo já está no JSON, considera tudo processado
+        ultimo_modelo_disponivel = modelos_nomes[max_modelos_loop - 1] if max_modelos_loop > 0 else None
+        modelos_ja_processados = modelos_processados.get(nome_marca, [])
+        
+        if ultimo_modelo_disponivel and ultimo_modelo_disponivel in modelos_ja_processados:
+            logging.info(f"[SKIP] Todos os modelos da marca {nome_marca} já foram processados. Pulando...")
+            marcas_processadas.add(nome_marca.strip())
+            salvar_marcas_processadas(marcas_processadas)
+            return
         
         if nome_marca not in modelos_processados:
             modelos_processados[nome_marca] = []
+        
+        if modelos_processados[nome_marca]:
+            ultimo_modelo_salvo = modelos_processados[nome_marca][-1]
+            try:
+                indice_modelo_inicial = modelos_nomes.index(ultimo_modelo_salvo) + 1
+                logging.info(f"[RETOMADA] Continuando do modelo '{ultimo_modelo_salvo}' (índice {indice_modelo_inicial})")
+            except ValueError:
+                logging.warning(f"[RETOMADA] Último modelo '{ultimo_modelo_salvo}' não encontrado. Recomeçando do início.")
                     
         # Determina ponto de retomada para modelos da marca atual
         modelos_ja_processados = modelos_processados.get(nome_marca, [])
@@ -230,14 +248,25 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
         for modelo_index in range(indice_modelo_inicial, max_modelos_loop):
             try:
                 nome_modelo = (await modelos[modelo_index].text_content()).strip()
-                if nome_modelo in modelos_processados[nome_marca]:
-                    logging.info(f"  [SKIP] Modelo já processado: {nome_modelo}")
-                    continue
-
                 logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
-
                 await abrir_dropdown_e_esperar(page, "selectAnoModelomoto_chosen")
                 await selecionar_item_por_index(page, "selectAnoModelomoto_chosen", modelo_index, use_arrow=True)
+                await asyncio.sleep(0.5)
+
+                # Verifica se o modelo foi realmente selecionado
+                modelo_selecionado = await page.locator('#selectAnoModelomoto_chosen span').inner_text()
+                if nome_modelo not in modelo_selecionado:
+                    logging.warning(f"[AVISO] Falha ao selecionar o modelo {nome_modelo}, tentando resetar dropdowns...")
+                    # Refaz a seleção completa
+                    await abrir_dropdown_e_esperar(page, "selectMarcamoto_chosen")
+                    await selecionar_item_por_index(page, "selectMarcamoto_chosen", marca_index, use_arrow=True)
+                    await page.keyboard.press("Escape")
+                    await asyncio.sleep(0.3)
+
+                    await abrir_dropdown_e_esperar(page, "selectAnoModelomoto_chosen")
+                    await selecionar_item_por_index(page, "selectAnoModelomoto_chosen", modelo_index, use_arrow=True)
+                    await page.keyboard.press("Escape")
+                    await asyncio.sleep(0.3)
 
                 await abrir_dropdown_e_esperar(page, "selectAnomoto_chosen")
                 anos = await page.query_selector_all('div.chosen-container#selectAnomoto_chosen ul.chosen-results > li')
@@ -364,7 +393,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
     salvar_marcas_processadas(marcas_processadas)
 
 # Função principal modificada para processar 3 marcas em paralelo
-async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=4):
+async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
     marcas_processadas = carregar_marcas_processadas()
     modelos_processados = carregar_modelos_processados()
 
