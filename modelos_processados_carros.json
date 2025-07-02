@@ -2294,7 +2294,13 @@
     "EcoSport FREESTYLE PLUS 1.5 Flex 5p Aut.",
     "EcoSport S 1.6 16V Flex 5p",
     "EcoSport SE 1.5 12V Flex 5p Aut.",
-    "EcoSport SE 1.5 12V Flex 5p Mec."
+    "EcoSport SE 1.5 12V Flex 5p Mec.",
+    "EcoSport SE 1.6 16V Flex 5p Aut.",
+    "EcoSport SE 1.6 16V Flex 5p Mec.",
+    "EcoSport SE 2.0 16V Flex 5p Aut.",
+    "EcoSport SE Direct 1.5 Flex 5p Aut.",
+    "EcoSport SE Direct 1.6 16V Flex 5p Aut.",
+    "EcoSport STORM 2.0 4WD 16V Flex 5p Aut."
   ],
   "FOTON": [
     "AUMARK 3.5 - 11DT 2.8 4x2 TB Diesel",
@@ -2347,6 +2353,13 @@
     "Astra 2.0 8V/ CD 2.0 8V Hatchback 5p Aut",
     "Astra 2.0 8V/ CD 2.0 8V Hatchback 5p Mec",
     "Astra 2.0/ CD 2.0 8V 3p Aut.",
-    "Astra 2.0/ CD/ GLS 2.0 MPFI 16V 3p"
+    "Astra 2.0/ CD/ GLS 2.0 MPFI 16V 3p",
+    "Astra 2.0/ CD/ Sunny/ GLS 2.0 8V 3p",
+    "Astra 500 Sedan 2.0 MPFI 16V 4p",
+    "Astra Advant. 2.0 MPFI 8V FlexP. 5p Aut.",
+    "Astra Advantage 2.0 MPFI 8V FlexPower 5p",
+    "Astra Advantage 2.0 MPFI FlexPower 8V 3p",
+    "Astra Comfort 2.0 MPFI FlexPower 8V 3p",
+    "Astra Comfort 2.0 MPFI FlexPower 8V 5p"
   ]
 }
