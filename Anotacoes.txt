@@ -1,4 +1,0 @@
-Código Simultanea funcionando corretamente 
-
- -> Fazer uma função que verifica se todos os modelos de determinada marca foram pegos para não deixar nenhum dado faltando.
- 

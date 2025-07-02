@@ -1399,7 +1399,9 @@
     "Fiorino Furgão 1.0",
     "Fiorino Furgão 1.5 mpi / i.e.",
     "Fiorino Furgão Celeb. EVO 1.4 Flex 8V 2p",
-    "Fiorino Furgão EVO 1.4 Flex 8V 2p"
+    "Fiorino Furgão EVO 1.4 Flex 8V 2p",
+    "Fiorino Furgão Work. HARD 1.4 Flex 8V 2p",
+    "Fiorino Pick-Up 1.0"
   ],
   "Honda": [
     "Accord Coupe EX",
@@ -2306,7 +2308,8 @@
     "EcoSport TITANIUM 1.5 12V Flex 5p Aut.",
     "EcoSport TITANIUM 1.6 16V Flex 5p",
     "EcoSport TITANIUM 2.0 16V Flex 5p",
-    "EcoSport TITANIUM 2.0 16V Flex 5p Aut."
+    "EcoSport TITANIUM 2.0 16V Flex 5p Aut.",
+    "EcoSport XL 1.6/ 1.6 Flex 8V 5p"
   ],
   "FOTON": [
     "AUMARK 3.5 - 11DT 2.8 4x2 TB Diesel",
@@ -2369,6 +2372,10 @@
     "Astra Comfort 2.0 MPFI FlexPower 8V 5p",
     "Astra Eleg. 2.0 MPFI FlexPower 8V 5p Aut",
     "Astra Elegance 2.0 MPFI FlexPower 8V 3p",
-    "Astra Elegance 2.0 MPFI FlexPower 8V 5p"
+    "Astra Elegance 2.0 MPFI FlexPower 8V 5p",
+    "Astra Elite 2.0 MPFI Flex Pow. 8V 5p Aut",
+    "Astra Elite 2.0 MPFI FlexPower 8V 5p Mec",
+    "Astra GL 1.8 MPFI 3p",
+    "Astra GL Milenium 1.8 MPFI 4p"
   ]
 }

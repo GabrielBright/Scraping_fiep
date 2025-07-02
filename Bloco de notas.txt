@@ -1,0 +1,9 @@
+Fiz algumas alterações no código:
+
+    Algumas das alterações foram de ao inves de salvar o arquivo temp apos cada ano coletado agora só salva quando temina de pegar o modelo, ou seja, só salva no arquivo temp apos coletar todos os anos de determinado modelo, não sei se seria viavel fazer para marca pq por exemplo a ford que tem 441 modelos vai demorar muito até conseguir salvar apos terminar todos esses modelo então opitei por fazer dessa forma 
+
+    Outra alteração foi de criar a função "obter_modelos_disponiveis"
+
+Otimizações futuras:
+
+    Estou vendo que outras otimizações eu posso fazer, só que eu não sei se vale tanto a pena pq pode colocar em risco a integridade da coleta
