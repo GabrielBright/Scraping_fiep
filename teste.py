@@ -251,7 +251,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                 logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
                 await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                 await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
-                await asyncio.sleep(0.5)
+                await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=50000)
 
                 # Verifica se o modelo foi realmente selecionado
                 modelo_selecionado = await page.locator('#selectAnoModelocarro_chosen span').inner_text()
@@ -261,12 +261,12 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                     await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
                     await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
                     await page.keyboard.press("Escape")
-                    await asyncio.sleep(0.3)
+                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=30000)
 
                     await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                     await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
                     await page.keyboard.press("Escape")
-                    await asyncio.sleep(0.3)
+                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=30000)
 
                 await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
                 anos = await page.query_selector_all('div.chosen-container#selectAnocarro_chosen ul.chosen-results > li')
@@ -275,18 +275,18 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                 for ano_index in range(max_anos_loop):
                     try:
                         await limpar_pesquisa(page)
-                        await asyncio.sleep(1.5)
+                        await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=15000)
 
                         if ano_index > 0:
                             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
                             await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
                             await page.keyboard.press("Escape")
-                            await asyncio.sleep(0.3)
+                            await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=15000)
 
                             await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                             await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
                             await page.keyboard.press("Escape")
-                            await asyncio.sleep(0.3)
+                            await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=30000)
 
                         nome_ano = await anos[ano_index].text_content()
                         logging.info(f"    Ano [{ano_index+1}]: {nome_ano.strip()}")
@@ -299,7 +299,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                         await botao_pesquisar.scroll_into_view_if_needed()
                         await botao_pesquisar.click(force=True)
 
-                        await asyncio.sleep(5)
+                        await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=50000)
                         await page.wait_for_selector('div#resultadoConsultacarroFiltros', state='visible', timeout=30000)
 
                         codigo_fipe_elements = await page.locator('td:has-text("Código Fipe") + td p').all_text_contents()

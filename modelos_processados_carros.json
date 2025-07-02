@@ -1401,7 +1401,9 @@
     "Fiorino Furgão Celeb. EVO 1.4 Flex 8V 2p",
     "Fiorino Furgão EVO 1.4 Flex 8V 2p",
     "Fiorino Furgão Work. HARD 1.4 Flex 8V 2p",
-    "Fiorino Pick-Up 1.0"
+    "Fiorino Pick-Up 1.0",
+    "Fiorino Pick-Up 1.5 i.e./1.3/1.5/HD",
+    "Fiorino Pick-Up LX (todas)"
   ],
   "Honda": [
     "Accord Coupe EX",
@@ -2309,7 +2311,11 @@
     "EcoSport TITANIUM 1.6 16V Flex 5p",
     "EcoSport TITANIUM 2.0 16V Flex 5p",
     "EcoSport TITANIUM 2.0 16V Flex 5p Aut.",
-    "EcoSport XL 1.6/ 1.6 Flex 8V 5p"
+    "EcoSport XL 1.6/ 1.6 Flex 8V 5p",
+    "EcoSport XL Supercharger 1.0 8V 95cv 5p",
+    "EcoSport XLS 1.6/ 1.6 Flex 8V 5p",
+    "EcoSport XLS 2.0/2.0 Flex 16V 5p Aut.",
+    "EcoSport XLS FREESTYLE 1.6 Flex 8V 5p"
   ],
   "FOTON": [
     "AUMARK 3.5 - 11DT 2.8 4x2 TB Diesel",
@@ -2376,6 +2382,13 @@
     "Astra Elite 2.0 MPFI Flex Pow. 8V 5p Aut",
     "Astra Elite 2.0 MPFI FlexPower 8V 5p Mec",
     "Astra GL 1.8 MPFI 3p",
-    "Astra GL Milenium 1.8 MPFI 4p"
+    "Astra GL Milenium 1.8 MPFI 4p",
+    "Astra GLS 2.0 MPFI",
+    "Astra GLS 2.0 MPFI SW",
+    "Astra GSi 2.0 16V 136cv Hatchback 5p",
+    "Astra S.Sport 2.0 F.Pow. 5p/Sport 2.0 3p",
+    "Astra Sed. Advant. 2.0 8V MPFI FlexP. 4p",
+    "Astra Sed.Advan. 2.0 8V MPFI FlexP. Aut.",
+    "Astra Sed.Comf. 2.0 MPFI FlexPower 8V 4p"
   ]
 }

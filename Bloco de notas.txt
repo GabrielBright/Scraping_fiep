@@ -4,6 +4,12 @@ Fiz algumas alterações no código:
 
     Outra alteração foi de criar a função "obter_modelos_disponiveis"
 
+    Simplifiquei a forma de achar o ultimo modelo disponivel, assim facilitando encontrar o ultimo modelo
+
+    Alteração do sleep(0.15), etc por \await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=10000) o que faz esperar só o necessário e não um tempo fixo o que as vezes pode gastar um tempo de processamento
+
 Otimizações futuras:
 
     Estou vendo que outras otimizações eu posso fazer, só que eu não sei se vale tanto a pena pq pode colocar em risco a integridade da coleta
+
+    -> Tive uma ideia, usar Multprocessing, que seria abrir 3 navegadores diferentes e cada navegador abrir 3 abas - Só que eu teria que deixar assincrono para não ocorrero risco de sobreescrever caso seja coletados e transferidos ao arquivo Excel Fipe_temp e perder dados.
