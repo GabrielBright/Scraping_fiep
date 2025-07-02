@@ -367,8 +367,6 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                         modelo_novo = nome_modelo not in modelos_processados[nome_marca]
                         if modelo_novo:
                             modelos_processados[nome_marca].append(nome_modelo)
-                            
-                        if modelo_novo:
                             salvar_modelos_processados(modelos_processados)
 
                         df_completo.to_excel(temp, index=False)
@@ -389,9 +387,6 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
         await asyncio.sleep(2)
     
     finally:
-        await limpar_pesquisa(page)
-        await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-        await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
         marcas_processadas.add(nome_marca.strip())
         salvar_marcas_processadas(marcas_processadas)
 

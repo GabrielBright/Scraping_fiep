@@ -2315,7 +2315,9 @@
     "EcoSport XL Supercharger 1.0 8V 95cv 5p",
     "EcoSport XLS 1.6/ 1.6 Flex 8V 5p",
     "EcoSport XLS 2.0/2.0 Flex 16V 5p Aut.",
-    "EcoSport XLS FREESTYLE 1.6 Flex 8V 5p"
+    "EcoSport XLS FREESTYLE 1.6 Flex 8V 5p",
+    "EcoSport XLT 1.6/ 1.6 Flex 8V 5p",
+    "EcoSport XLT 2.0/ 2.0 Flex 16V 5p Aut."
   ],
   "FOTON": [
     "AUMARK 3.5 - 11DT 2.8 4x2 TB Diesel",
@@ -2389,6 +2391,11 @@
     "Astra S.Sport 2.0 F.Pow. 5p/Sport 2.0 3p",
     "Astra Sed. Advant. 2.0 8V MPFI FlexP. 4p",
     "Astra Sed.Advan. 2.0 8V MPFI FlexP. Aut.",
-    "Astra Sed.Comf. 2.0 MPFI FlexPower 8V 4p"
+    "Astra Sed.Comf. 2.0 MPFI FlexPower 8V 4p",
+    "Astra Sed.Comf.2.0 MPFI MultiPower 8V 4p",
+    "Astra Sed.Eleg. 2.0 MPFI FlexP.8V Aut.",
+    "Astra Sed.Eleg.2.0 MPFI FlexPower 8V 4p",
+    "Astra Sed.Eleg.2.0 MPFI MultiPower 8V 4p",
+    "Astra Sed.Elite 2.0 MPFI FlexP.8V Aut."
   ]
 }

@@ -8,8 +8,13 @@ Fiz algumas alterações no código:
 
     Alteração do sleep(0.15), etc por \await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=10000) o que faz esperar só o necessário e não um tempo fixo o que as vezes pode gastar um tempo de processamento
 
+    Passar essas alterações para o de motos e caminhões e testar
+        -> Tinha dado um erro no de caminhões que eu preciso debugar e verificar o que foi erro que deu 
+
 Otimizações futuras:
 
     Estou vendo que outras otimizações eu posso fazer, só que eu não sei se vale tanto a pena pq pode colocar em risco a integridade da coleta
 
     -> Tive uma ideia, usar Multprocessing, que seria abrir 3 navegadores diferentes e cada navegador abrir 3 abas - Só que eu teria que deixar assincrono para não ocorrero risco de sobreescrever caso seja coletados e transferidos ao arquivo Excel Fipe_temp e perder dados.
+        -> Vou testar
+    
