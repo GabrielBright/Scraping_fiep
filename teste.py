@@ -196,12 +196,124 @@ async def worker(queue, browser_context, marcas_lista, modelos_processados, marc
 
 async def inicializaAPagina(page):
     logging.warning(f"[INICIANDO] Acessando FIPE...")
-    await page.goto("https://veiculos.fipe.org.br/", Timeout=30000)
+    await page.goto("https://veiculos.fipe.org.br/", timeout=120000)
     await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', timeout=30000)
     await page.click('li:has-text("Carros e utilitários pequenos")')
     await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
     await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")
     
+# Função para processar marca, ou seja, como cada aba vai processar a coleta de dados
+async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos):
+    
+    nome_marca = marcas_nomes[marca_index]
+    logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca}")
+    
+    try:
+        await inicializaAPagina(page)
+        await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+        await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+
+        # Carrega modelos
+        await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+        modelos = await page.query_selector_all('div.chosen-container#selectAnoModelocarro_chosen ul.chosen-results > li')
+        modelos_nomes = [(await m.text_content()).strip() for m in modelos]
+        max_modelos_loop = len(modelos_nomes) if max_modelos is None else min(max_modelos, len(modelos_nomes))
+
+        # Verifica se todos os modelos já foram processados
+        if nome_marca in modelos_processados and modelos_nomes[-1] in modelos_processados[nome_marca]:
+            logging.info(f"[SKIP] Todos os modelos da marca {nome_marca} já foram processados.")
+            return
+
+        if nome_marca not in modelos_processados:
+            modelos_processados[nome_marca] = []
+
+        # Determina ponto de retomada
+        indice_modelo_inicial = 0
+        if modelos_processados[nome_marca]:
+            ultimo_modelo_salvo = modelos_processados[nome_marca][-1]
+            try:
+                indice_modelo_inicial = modelos_nomes.index(ultimo_modelo_salvo) + 1
+                logging.info(f"[RETOMADA] Continuando do modelo '{ultimo_modelo_salvo}' (índice {indice_modelo_inicial})")
+            except ValueError:
+                logging.warning(f"[RETOMADA] Último modelo '{ultimo_modelo_salvo}' não encontrado. Recomeçando.")
+
+        # Itera sobre os modelos
+        for modelo_index in tqdm(range(indice_modelo_inicial, max_modelos_loop), desc=f"Modelos de {nome_marca}"):
+            await processar_modelo(page, marca_index, modelo_index, modelos_nomes, nome_marca, modelos_processados, max_anos)
+            await limpar_pesquisa(page)
+            await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+            await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+
+        logging.info(f"[CONCLUÍDO] Marca {nome_marca}: {len(modelos_processados[nome_marca])} modelos processados.")
+    except Exception as e:
+        logging.error(f"[ERRO] Marca [{marca_index+1}]: {e}")
+    finally:
+        marcas_processadas.add(nome_marca.strip())
+        salvar_marcas_processadas(marcas_processadas)
+        
+async def processar_modelo(page, marca_index, modelo_index, modelos_nomes, nome_marca, modelos_processados, max_anos):
+    
+    dados_coletados = []
+    
+    try:
+        nome_modelo = modelos_nomes[modelo_index]
+        if nome_modelo in modelos_processados.get(nome_marca, []):
+            logging.info(f"[SKIP] Modelo {nome_modelo} já processado.")
+            return
+
+        logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
+        await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+        await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
+
+        # Verifica seleção do modelo
+        modelo_selecionado = (await page.locator('#selectAnoModelocarro_chosen span').inner_text()).strip().lower()
+        if nome_modelo.lower() not in modelo_selecionado:
+            logging.warning(f"[AVISO] Falha ao selecionar o modelo {nome_modelo}, tentando resetar...")
+            await limpar_pesquisa(page)
+            await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+            await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+            await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+            await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
+
+        # Itera sobre os anos
+        await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
+        anos = await page.query_selector_all('div.chosen-container#selectAnocarro_chosen ul.chosen-results > li')
+        max_anos_loop = len(anos) if max_anos is None else min(max_anos, len(anos))
+
+        for ano_index in tqdm(range(max_anos_loop), desc=f"Anos de {nome_modelo}"):
+            if ano_index > 0:
+                await limpar_pesquisa(page)
+                await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+                await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
+                await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+                await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
+            await processar_ano(page, marca_index, modelo_index, ano_index, anos, nome_marca, nome_modelo, modelos_processados)
+        
+            await processar_ano(
+                page,
+                ano_index,
+                anos,
+                nome_marca,
+                nome_modelo,
+                modelos_processados,
+                dados_coletados
+            )
+
+        # Salva todos os dados quando termina um modelo 
+        if dados_coletados:
+            temp = "Fipe_temp.xlsx"
+            fipe_temp_novo = pd.DataFrame(dados_coletados) 
+            if os.path.exists(temp):
+                fipe_temp_antigo = pd.read_excel(temp)
+                df_completo = pd.concat([fipe_temp_antigo, fipe_temp_novo], ignore_index=True).drop_duplicates()
+            else:
+                df_completo = fipe_temp_novo
+            df_completo.to_excel(temp, index=False)
+            logging.info(f"[SALVO] Dados de {len(dados_coletados)} anos do modelo {nome_modelo} salvos em {temp}")
+        
+    except Exception as e:
+        logging.warning(f"[ERRO] Modelo [{modelo_index+1}]: {e}")
+        
 async def processar_ano(page, ano_index, anos, nome_marca, nome_modelo, modelos_processados, dados_coletados):
     try:
         nome_ano = (await anos[ano_index].text_content()).strip()
@@ -266,118 +378,6 @@ async def processar_ano(page, ano_index, anos, nome_marca, nome_modelo, modelos_
 
     except Exception as e:
         logging.warning(f"[ERRO] Ano [{ano_index+1}] do Modelo [{nome_modelo}]: {e}")
-        
-async def processar_modelo(page, marca_index, modelo_index, modelos_nomes, nome_marca, modelos_processados, max_anos):
-    
-    dados_coletados = []
-    
-    try:
-        nome_modelo = modelos_nomes[modelo_index]
-        if nome_modelo in modelos_processados.get(nome_marca, []):
-            logging.info(f"[SKIP] Modelo {nome_modelo} já processado.")
-            return
-
-        logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
-        await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
-        await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
-
-        # Verifica seleção do modelo
-        modelo_selecionado = (await page.locator('#selectAnoModelocarro_chosen span').inner_text()).strip().lower()
-        if nome_modelo.lower() not in modelo_selecionado:
-            logging.warning(f"[AVISO] Falha ao selecionar o modelo {nome_modelo}, tentando resetar...")
-            await limpar_pesquisa(page)
-            await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-            await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
-            await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
-            await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
-
-        # Itera sobre os anos
-        await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
-        anos = await page.query_selector_all('div.chosen-container#selectAnocarro_chosen ul.chosen-results > li')
-        max_anos_loop = len(anos) if max_anos is None else min(max_anos, len(anos))
-
-        for ano_index in tqdm(range(max_anos_loop), desc=f"Anos de {nome_modelo}"):
-            if ano_index > 0:
-                await limpar_pesquisa(page)
-                await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-                await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
-                await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
-                await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
-            await processar_ano(page, marca_index, modelo_index, ano_index, anos, nome_marca, nome_modelo, modelos_processados)
-        
-            await processar_ano(
-                page,
-                ano_index,
-                anos,
-                nome_marca,
-                nome_modelo,
-                modelos_processados,
-                dados_coletados
-            )
-
-        # Salva todos os dados quando termina um modelo 
-        if dados_coletados:
-            temp = "Fipe_temp.xlsx"
-            fipe_temp_novo = pd.DataFrame(dados_coletados) 
-            if os.path.exists(temp):
-                fipe_temp_antigo = pd.read_excel(temp)
-                df_completo = pd.concat([fipe_temp_antigo, fipe_temp_novo], ignore_index=True).drop_duplicates()
-            else:
-                df_completo = fipe_temp_novo
-            df_completo.to_excel(temp, index=False)
-            logging.info(f"[SALVO] Dados de {len(dados_coletados)} anos do modelo {nome_modelo} salvos em {temp}")
-        
-    except Exception as e:
-        logging.warning(f"[ERRO] Modelo [{modelo_index+1}]: {e}")
-
-# Função para processar marca, ou seja, como cada aba vai processar a coleta de dados
-async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos):
-    
-    nome_marca = marcas_nomes[marca_index]
-    logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca}")
-    
-    try:
-        await inicializaAPagina(page)
-        await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-        await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
-
-        # Carrega modelos
-        await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
-        modelos = await page.query_selector_all('div.chosen-container#selectAnoModelocarro_chosen ul.chosen-results > li')
-        modelos_nomes = [(await m.text_content()).strip() for m in modelos]
-        max_modelos_loop = len(modelos_nomes) if max_modelos is None else min(max_modelos, len(modelos_nomes))
-
-        # Verifica se todos os modelos já foram processados
-        if nome_marca in modelos_processados and modelos_nomes[-1] in modelos_processados[nome_marca]:
-            logging.info(f"[SKIP] Todos os modelos da marca {nome_marca} já foram processados.")
-            return
-
-        if nome_marca not in modelos_processados:
-            modelos_processados[nome_marca] = []
-
-        # Determina ponto de retomada
-        indice_modelo_inicial = 0
-        if modelos_processados[nome_marca]:
-            ultimo_modelo_salvo = modelos_processados[nome_marca][-1]
-            try:
-                indice_modelo_inicial = modelos_nomes.index(ultimo_modelo_salvo) + 1
-                logging.info(f"[RETOMADA] Continuando do modelo '{ultimo_modelo_salvo}' (índice {indice_modelo_inicial})")
-            except ValueError:
-                logging.warning(f"[RETOMADA] Último modelo '{ultimo_modelo_salvo}' não encontrado. Recomeçando.")
-
-        # Itera sobre os modelos
-        for modelo_index in tqdm(range(indice_modelo_inicial, max_modelos_loop), desc=f"Modelos de {nome_marca}"):
-            await processar_modelo(page, marca_index, modelo_index, modelos_nomes, nome_marca, modelos_processados, max_anos)
-            await limpar_pesquisa(page)
-            await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
-            await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
-
-        logging.info(f"[CONCLUÍDO] Marca {nome_marca}: {len(modelos_processados[nome_marca])} modelos processados.")
-    except Exception as e:
-        logging.error(f"[ERRO] Marca [{marca_index+1}]: {e}")
-    finally:
-        marcas_processadas.add(nome_marca.strip())
-        salvar_marcas_processadas(marcas_processadas)
 
 # Função principal modificada para processar 3 marcas em paralelo
 async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
