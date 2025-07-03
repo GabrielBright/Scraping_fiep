@@ -190,8 +190,16 @@ async def worker(queue, browser_context, marcas_lista, modelos_processados, marc
         finally:
             await page.close()
             queue.task_done()
-    
+
+async def obter_modelos_disponiveis(page):
+    await abrir_dropdown_e_esperar(page, "selectAnoModelomoto_chosen")
+    modelos = await page.query_selector_all('div.chosen-container#selectAnoModelomoto_chosen ul.chosen-results > li')
+    modelos_nomes = [ (await m.text_content()).strip() for m in modelos ]
+    return modelos, modelos_nomes
+
+# Função para processar marca, ou seja, como cada aba vai processar a coleta de dados
 async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos):
+    
     nome_marca = marcas_nomes[marca_index]
     logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca}")
 
@@ -200,23 +208,20 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
 
         await page.wait_for_selector('li:has-text("Motos")', timeout=30000)
         await page.click('li:has-text("Motos")')
-
         await abrir_dropdown_e_esperar(page, "selectTabelaReferenciamoto_chosen")
-        await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciamoto_chosen")
-        
+        await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciamoto_chosen")  
         await abrir_dropdown_e_esperar(page, "selectMarcamoto_chosen")
         await selecionar_item_por_index(page, "selectMarcamoto_chosen", marca_index, use_arrow=True)
-
         logging.info("Aguardando carregamento de Modelos...")
         await abrir_dropdown_e_esperar(page, "selectAnoModelomoto_chosen")
-        modelos = await page.query_selector_all('div.chosen-container#selectAnoModelomoto_chosen ul.chosen-results > li')
-        modelos_nomes = [ (await m.text_content()).strip() for m in modelos ]
-        max_modelos_loop = len(modelos) if max_modelos is None else min(max_modelos, len(modelos))
         
+        modelos, modelos_nomes = await obter_modelos_disponiveis(page)
+        max_modelos_loop = len(modelos_nomes) if max_modelos is None else min(max_modelos, len(modelos_nomes))
+
         # Verificação rápida: se o último modelo já está no JSON, considera tudo processado
         ultimo_modelo_disponivel = modelos_nomes[max_modelos_loop - 1] if max_modelos_loop > 0 else None
         modelos_ja_processados = modelos_processados.get(nome_marca, [])
-        
+
         if ultimo_modelo_disponivel and ultimo_modelo_disponivel in modelos_ja_processados:
             logging.info(f"[SKIP] Todos os modelos da marca {nome_marca} já foram processados. Pulando...")
             marcas_processadas.add(nome_marca.strip())
@@ -226,32 +231,24 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
         if nome_marca not in modelos_processados:
             modelos_processados[nome_marca] = []
         
-        if modelos_processados[nome_marca]:
+        modelos_ja_processados = modelos_processados.get(nome_marca, [])
+
+        indice_modelo_inicial = 0
+        if modelos_processados.get(nome_marca):
             ultimo_modelo_salvo = modelos_processados[nome_marca][-1]
-            try:
+            if ultimo_modelo_salvo in modelos_nomes:
                 indice_modelo_inicial = modelos_nomes.index(ultimo_modelo_salvo) + 1
                 logging.info(f"[RETOMADA] Continuando do modelo '{ultimo_modelo_salvo}' (índice {indice_modelo_inicial})")
-            except ValueError:
-                logging.warning(f"[RETOMADA] Último modelo '{ultimo_modelo_salvo}' não encontrado. Recomeçando do início.")
-                    
+
         # Determina ponto de retomada para modelos da marca atual
-        modelos_ja_processados = modelos_processados.get(nome_marca, [])
-        indice_modelo_inicial = 0
-
-        for i, modelo in enumerate(modelos):
-            nome = (await modelo.text_content()).strip()
-            if modelos_ja_processados and nome == modelos_ja_processados[-1]:
-                indice_modelo_inicial = i + 1
-                break
-
-        # Loop principal de modelos com retomada
         for modelo_index in range(indice_modelo_inicial, max_modelos_loop):
             try:
                 nome_modelo = (await modelos[modelo_index].text_content()).strip()
+                
                 logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
                 await abrir_dropdown_e_esperar(page, "selectAnoModelomoto_chosen")
                 await selecionar_item_por_index(page, "selectAnoModelomoto_chosen", modelo_index, use_arrow=True)
-                await asyncio.sleep(0.5)
+                await page.wait_for_selector('#buttonPesquisarmoto', state='visible', timeout=50000)
 
                 # Verifica se o modelo foi realmente selecionado
                 modelo_selecionado = await page.locator('#selectAnoModelomoto_chosen span').inner_text()
@@ -261,12 +258,12 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                     await abrir_dropdown_e_esperar(page, "selectMarcamoto_chosen")
                     await selecionar_item_por_index(page, "selectMarcamoto_chosen", marca_index, use_arrow=True)
                     await page.keyboard.press("Escape")
-                    await asyncio.sleep(0.3)
+                    await page.wait_for_selector('#buttonPesquisarmoto', state='visible', timeout=30000)
 
                     await abrir_dropdown_e_esperar(page, "selectAnoModelomoto_chosen")
                     await selecionar_item_por_index(page, "selectAnoModelomoto_chosen", modelo_index, use_arrow=True)
                     await page.keyboard.press("Escape")
-                    await asyncio.sleep(0.3)
+                    await page.wait_for_selector('#buttonPesquisarmoto', state='visible', timeout=30000)
 
                 await abrir_dropdown_e_esperar(page, "selectAnomoto_chosen")
                 anos = await page.query_selector_all('div.chosen-container#selectAnomoto_chosen ul.chosen-results > li')
@@ -275,18 +272,18 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                 for ano_index in range(max_anos_loop):
                     try:
                         await limpar_pesquisa(page)
-                        await asyncio.sleep(1.5)
+                        await page.wait_for_selector('#buttonPesquisarmoto', state='visible', timeout=15000)
 
                         if ano_index > 0:
                             await abrir_dropdown_e_esperar(page, "selectMarcamoto_chosen")
                             await selecionar_item_por_index(page, "selectMarcamoto_chosen", marca_index, use_arrow=True)
                             await page.keyboard.press("Escape")
-                            await asyncio.sleep(0.3)
+                            await page.wait_for_selector('#buttonPesquisarmoto', state='visible', timeout=15000)
 
                             await abrir_dropdown_e_esperar(page, "selectAnoModelomoto_chosen")
                             await selecionar_item_por_index(page, "selectAnoModelomoto_chosen", modelo_index, use_arrow=True)
                             await page.keyboard.press("Escape")
-                            await asyncio.sleep(0.3)
+                            await page.wait_for_selector('#buttonPesquisarmoto', state='visible', timeout=30000)
 
                         nome_ano = await anos[ano_index].text_content()
                         logging.info(f"    Ano [{ano_index+1}]: {nome_ano.strip()}")
@@ -295,11 +292,11 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                         await selecionar_item_por_index(page, "selectAnomoto_chosen", ano_index, use_arrow=True)
 
                         logging.info("    Realizando busca...")
-                        botao_pesquisar = page.locator('#buttonPesquisarcarro')
+                        botao_pesquisar = page.locator('#buttonPesquisarmoto')
                         await botao_pesquisar.scroll_into_view_if_needed()
                         await botao_pesquisar.click(force=True)
 
-                        await asyncio.sleep(5)
+                        await page.wait_for_selector('#buttonPesquisarmoto', state='visible', timeout=50000)
                         await page.wait_for_selector('div#resultadoConsultamotoFiltros', state='visible', timeout=30000)
 
                         codigo_fipe_elements = await page.locator('td:has-text("Código Fipe") + td p').all_text_contents()
@@ -364,7 +361,8 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                         if nome_marca not in modelos_processados:
                             modelos_processados[nome_marca] = []
                         
-                        if nome_modelo not in modelos_processados[nome_marca]:
+                        modelo_novo = nome_modelo not in modelos_processados[nome_marca]
+                        if modelo_novo:
                             modelos_processados[nome_marca].append(nome_modelo)
                             salvar_modelos_processados(modelos_processados)
 
@@ -377,20 +375,17 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
             except Exception as e:
                 logging.warning(f"[ERRO] Modelo [{modelo_index+1}]: {e}")
                 await asyncio.sleep(2)
-
-            finally:
-                await limpar_pesquisa(page)
-                await abrir_dropdown_e_esperar(page, "selectMarcamoto_chosen")
-                await selecionar_item_por_index(page, "selectMarcamoto_chosen", marca_index, use_arrow=True)
-                marcas_processadas.add(nome_marca.strip())
-                salvar_marcas_processadas(marcas_processadas)
+                
+        # Loga que terminou a marca e quantos modelos foram processados
+        logging.info(f"[CONCLUÍDO] Marca {nome_marca}: {len(modelos_processados[nome_marca])} modelos processados.")
 
     except Exception as e:
         logging.warning(f"[ERRO] Marca [{marca_index+1}]: {e}")
         await asyncio.sleep(2)
     
-    marcas_processadas.add(nome_marca.strip())
-    salvar_marcas_processadas(marcas_processadas)
+    finally:
+        marcas_processadas.add(nome_marca.strip())
+        salvar_marcas_processadas(marcas_processadas)
 
 # Função principal modificada para processar 3 marcas em paralelo
 async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
@@ -398,7 +393,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
     modelos_processados = carregar_modelos_processados()
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
+        browser = await p.chromium.launch(headless=False)
         context = await browser.new_context()
 
         try:
@@ -447,8 +442,8 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
 
 if __name__ == "__main__":
     asyncio.run(run(max_marcas=None, max_modelos=None, max_anos=None))
-
+    
     Fipe_df = pd.DataFrame(Fipe)
     print("\n\nDADOS FINAIS COLETADOS")
     print(Fipe_df)
-    Fipe_df.to_excel("Fipe_motos.xlsx", index=False)
+    Fipe_df.to_excel("Fipe_moto.xlsx", index=False)

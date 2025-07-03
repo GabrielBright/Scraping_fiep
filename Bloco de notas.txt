@@ -17,4 +17,35 @@ Otimizações futuras:
 
     -> Tive uma ideia, usar Multprocessing, que seria abrir 3 navegadores diferentes e cada navegador abrir 3 abas - Só que eu teria que deixar assincrono para não ocorrero risco de sobreescrever caso seja coletados e transferidos ao arquivo Excel Fipe_temp e perder dados.
         -> Vou testar
+        from itertools import cycle
+
+        browsers = [await p.chromium.launch() for _ in range(3)]
+        contexts = [await b.new_context() for b in browsers]
+
+        # Cria fila de marcas
+        queue = Queue()
+        for i in range(max_marcas):
+            await queue.put(i)
+
+        # Ciclo para revezar os contexts
+        context_cycle = cycle(contexts)
+
+        # Para cada navegador, cria 3 abas (3 workers por context)
+        workers = []
+        for context in contexts:
+            for _ in range(3):
+                ctx = next(context_cycle)
+                workers.append(asyncio.create_task(
+                    worker(queue, ctx, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos)
+                ))
+
+        await queue.join()
+        for task in workers:
+            task.cancel()
+
+    BUGS:
+
+    -> Ver o que pode ser que está bugando e fazendo a pagina reiniciar quando vai trocar de marca
+    -> Adicionar de outra maneira a seleção de mês 
+
     
