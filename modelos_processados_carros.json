@@ -676,7 +676,10 @@
     "X6 XDRIVE 50i 4.4 407cv Bi-Turbo",
     "X6 XDRIVE 50i M Sport 4.4 Bi-Turbo",
     "X7 M50i 4.4 V8 Bi-TB Aut.",
-    "X7 M50i Dark Shadow 4.4 V8 Bi-TB Aut."
+    "X7 M50i Dark Shadow 4.4 V8 Bi-TB Aut.",
+    "X7 M60i 4.4 V8 Bi-TB Aut.(Híbrido)",
+    "X7 XDRIVE 50i M Sport 4.4 V8 Bi-TB Aut.",
+    "Z3 2.8 Aut."
   ],
   "Baby": [
     "Buggy 1.6 2-Lug.",
@@ -2184,7 +2187,9 @@
     "GRANDIS 2.4 16V 163cv 5p Aut."
   ],
   "Fibravan": [
-
+    "Buggy Off Road 1.6 8V",
+    "Buggy Off Road 1.8 8V",
+    "Buggy Plus 1.6 8V"
   ],
   "Ford": [
     "Aerostar Mini-Van 3.8",
@@ -2243,19 +2248,8 @@
     "EcoSport XLS 2.0/2.0 Flex 16V 5p Aut.",
     "EcoSport XLS FREESTYLE 1.6 Flex 8V 5p",
     "EcoSport XLT 1.6/ 1.6 Flex 8V 5p",
-    "EcoSport XLT 2.0/ 2.0 Flex 16V 5p Aut."
-  ],
-  "FOTON": [
-
-  ],
-  "Fyber": [
-
-  ],
-  "GAC": [
-
-  ],
-  "GEELY": [
-
+    "EcoSport XLT 2.0/ 2.0 Flex 16V 5p Aut.",
+    "EcoSport XLT 2.0/ 2.0 Flex 16V 5p Mec."
   ],
   "GM - Chevrolet": [
     "A-10 2.5/4.1",
@@ -2297,7 +2291,6 @@
     "Astra Sed.Comf.2.0 MPFI MultiPower 8V 4p",
     "Astra Sed.Eleg. 2.0 MPFI FlexP.8V Aut.",
     "Astra Sed.Eleg.2.0 MPFI FlexPower 8V 4p",
-    "Astra Sed.Eleg.2.0 MPFI MultiPower 8V 4p",
-    "Astra Sed.Elite 2.0 MPFI FlexP.8V Aut."
+    "Astra Sed.Eleg.2.0 MPFI MultiPower 8V 4p"
   ]
 }

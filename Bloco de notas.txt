@@ -1,51 +1,5 @@
-Fiz algumas alterações no código:
+AS VEZES ESTÁ PULANDO SEM QUERER PQ ACONTECE ALGUM ERRO AO TENTAR COLETAR OS PRIMEIROS DADOS DE UM MODELOS APOS TERMINAR DE PEGAR UM 
 
-    Algumas das alterações foram de ao inves de salvar o arquivo temp apos cada ano coletado agora só salva quando temina de pegar o modelo, ou seja, só salva no arquivo temp apos coletar todos os anos de determinado modelo, não sei se seria viavel fazer para marca pq por exemplo a ford que tem 441 modelos vai demorar muito até conseguir salvar apos terminar todos esses modelo então opitei por fazer dessa forma 
-
-    Outra alteração foi de criar a função "obter_modelos_disponiveis"
-
-    Simplifiquei a forma de achar o ultimo modelo disponivel, assim facilitando encontrar o ultimo modelo
-
-    Alteração do sleep(0.15), etc por \await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=10000) o que faz esperar só o necessário e não um tempo fixo o que as vezes pode gastar um tempo de processamento
-
-    Passar essas alterações para o de motos e caminhões e testar
-        -> Tinha dado um erro no de caminhões que eu preciso debugar e verificar o que foi erro que deu 
-
-Otimizações futuras:
-
-    Estou vendo que outras otimizações eu posso fazer, só que eu não sei se vale tanto a pena pq pode colocar em risco a integridade da coleta
-
-    -> Tive uma ideia, usar Multprocessing, que seria abrir 3 navegadores diferentes e cada navegador abrir 3 abas - Só que eu teria que deixar assincrono para não ocorrero risco de sobreescrever caso seja coletados e transferidos ao arquivo Excel Fipe_temp e perder dados.
-        -> Vou testar
-        from itertools import cycle
-
-        browsers = [await p.chromium.launch() for _ in range(3)]
-        contexts = [await b.new_context() for b in browsers]
-
-        # Cria fila de marcas
-        queue = Queue()
-        for i in range(max_marcas):
-            await queue.put(i)
-
-        # Ciclo para revezar os contexts
-        context_cycle = cycle(contexts)
-
-        # Para cada navegador, cria 3 abas (3 workers por context)
-        workers = []
-        for context in contexts:
-            for _ in range(3):
-                ctx = next(context_cycle)
-                workers.append(asyncio.create_task(
-                    worker(queue, ctx, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos)
-                ))
-
-        await queue.join()
-        for task in workers:
-            task.cancel()
-
-    BUGS:
-
-    -> Ver o que pode ser que está bugando e fazendo a pagina reiniciar quando vai trocar de marca
-    -> Adicionar de outra maneira a seleção de mês 
-
+    -> Uma maneira que eu pensei de resolver isso seria a criação de uma função em que caso não consiga pegar o proximo modelo, e o erro que esta acontecendo de quando termina um modelo e vai ir para outro e vai pegar o primeiro ano modelo e da erro e pega outra marca outro modelo e outro ano mdeolo e depois de fazer isso e buscar esse modelo errado ele limpa a pesquisa e faz certo o que deveria fazer 
     
+        -> O que eu pensei que posso fazer é criar uma Função que caso aconteça isso faça um reload na pagina e tente fazer dnv 

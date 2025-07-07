@@ -15,6 +15,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 Fipe = []
 
 JSON = "modelos_processados_carros.json"
+MES = "meses_processados_carros.json"
 
 # Cria json se não houver Log de Marcas
 if not os.path.exists("marcas_processadas.json"):
@@ -29,6 +30,33 @@ if not os.path.exists(JSON):
 # Carrega modelos já processados
 with open(JSON, "r", encoding="utf-8") as f:
     modelos_processados = json.load(f)
+    
+if not os.path.exists("meses_processados_carros.json"):
+    with open("meses_processados_carros.json"):
+        json.dump([], f)
+        
+# Garante que o arquivo existe
+if not os.path.exists(MES):
+    with open(MES, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+# Carrega meses já processados
+with open(MES, "r", encoding="utf-8") as f:
+    meses_processados = json.load(f)
+    
+# Serve para carregar os meses pegos do arquivo JSON
+def carregar_meses_processados():
+    try:
+        with open(MES, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logging.warning(f"Erro ao carregar modelos processados: {e}")
+        return {}
+
+# Salva após coletar todos os meses de rferencia
+def salvar_meses_processados(meses_processados):
+    with open(MES, "w", encoding="utf-8") as f:
+        json.dump(meses_processados, f, ensure_ascii=False, indent=2)
 
 # Carrega as Marcas do Json
 def carregar_marcas_processadas():
@@ -173,26 +201,8 @@ async def fechar_todos_dropdowns(page):
     await page.evaluate("document.activeElement.blur();")
     await asyncio.sleep(0.3)
 
-# Para conseguir processar em multiplas abas o SCRAPING
-async def worker(queue, browser_context, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos):
-    while not queue.empty():
-        marca_index = await queue.get()
-        page = await browser_context.new_page()
-        try:
-            await processar_marca(
-                page,
-                marca_index,
-                marcas_lista,
-                modelos_processados,
-                marcas_processadas,
-                max_modelos,
-                max_anos
-            )
-        except Exception as e:
-            logging.error(f"[ERRO NO WORKER - Marca {marca_index+1}]: {e}")
-        finally:
-            await page.close()
-            queue.task_done()
+def split_lotes(total_marcas, n_lotes=3):
+    return [list(range(i, total_marcas, n_lotes)) for i in range(n_lotes)]
 
 async def obter_modelos_disponiveis(page):
     await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
@@ -201,7 +211,7 @@ async def obter_modelos_disponiveis(page):
     return modelos, modelos_nomes
 
 # Função para processar marca, ou seja, como cada aba vai processar a coleta de dados
-async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos):
+async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos, nome_mes):
     
     nome_marca = marcas_nomes[marca_index]
     logging.info(f"Processando Marca [{marca_index+1}]: {nome_marca}")
@@ -209,10 +219,21 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
     try:
         await page.goto('https://veiculos.fipe.org.br/', timeout=120000)
 
-        await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', timeout=30000)
+        await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', timeout=60000)
         await page.click('li:has-text("Carros e utilitários pequenos")')
+        
         await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
-        await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")  
+        meses_dropdown = await page.query_selector_all('div.chosen-container#selectTabelaReferenciacarro_chosen ul.chosen-results > li')
+        nomes_meses = [await m.text_content() for m in meses_dropdown]
+        nomes_meses = [m.strip() for m in nomes_meses]
+
+        if nome_mes not in nomes_meses:
+            logging.error(f"[ERRO] Mês '{nome_mes}' não encontrado no dropdown de Tabela de Referência!")
+            return
+
+        indice_mes = nomes_meses.index(nome_mes)
+        await selecionar_item_por_index(page, "selectTabelaReferenciacarro_chosen", indice_mes, use_arrow=True)
+        
         await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
         await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
         logging.info("Aguardando carregamento de Modelos...")
@@ -246,12 +267,30 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
         # Determina ponto de retomada para modelos da marca atual
         for modelo_index in range(indice_modelo_inicial, max_modelos_loop):
             try:
-                nome_modelo = (await modelos[modelo_index].text_content()).strip()
+                await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+                modelos, modelos_nomes = await obter_modelos_disponiveis(page)
+
+                # Se o dropdown não tem esse índice, espera mais e tenta de novo
+                tentativas_dropdown = 0
+                while modelo_index >= len(modelos_nomes):
+                    logging.warning(f"[AVISO] Dropdown de modelos ainda incompleto (esperado índice {modelo_index}, mas só há {len(modelos_nomes)}).")
+                    await asyncio.sleep(2)
+                    await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+                    modelos, modelos_nomes = await obter_modelos_disponiveis(page)
+                    tentativas_dropdown += 1
+                    if tentativas_dropdown >= 3:
+                        logging.error(f"[FALHA] Dropdown de modelos não carregou corretamente após 3 tentativas. Recarregando página.")
+                        await page.reload(wait_until="domcontentloaded")
+                        await asyncio.sleep(2)
+                        await processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos, nome_mes)
+                        return  # Sai dessa execução para recomeçar com a marca do zero
+
+                nome_modelo = modelos_nomes[modelo_index]
                 
                 logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
                 await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                 await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
-                await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=50000)
+                await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=60000)
 
                 # Verifica se o modelo foi realmente selecionado
                 modelo_selecionado = await page.locator('#selectAnoModelocarro_chosen span').inner_text()
@@ -261,12 +300,12 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                     await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
                     await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
                     await page.keyboard.press("Escape")
-                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=30000)
+                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=60000)
 
                     await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                     await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
                     await page.keyboard.press("Escape")
-                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=30000)
+                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=60000)
 
                 await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
                 anos = await page.query_selector_all('div.chosen-container#selectAnocarro_chosen ul.chosen-results > li')
@@ -275,7 +314,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                 for ano_index in range(max_anos_loop):
                     try:
                         await limpar_pesquisa(page)
-                        await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=15000)
+                        await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=55000)
 
                         if ano_index > 0:
                             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
@@ -286,7 +325,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                             await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                             await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
                             await page.keyboard.press("Escape")
-                            await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=30000)
+                            await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=50000)
 
                         nome_ano = await anos[ano_index].text_content()
                         logging.info(f"    Ano [{ano_index+1}]: {nome_ano.strip()}")
@@ -300,7 +339,7 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                         await botao_pesquisar.click(force=True)
 
                         await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=50000)
-                        await page.wait_for_selector('div#resultadoConsultacarroFiltros', state='visible', timeout=30000)
+                        await page.wait_for_selector('div#resultadoConsultacarroFiltros', state='visible', timeout=50000)
 
                         codigo_fipe_elements = await page.locator('td:has-text("Código Fipe") + td p').all_text_contents()
                         preco_medio_elements = await page.locator('td:has-text("Preço Médio") + td p').all_text_contents()
@@ -389,59 +428,122 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
     finally:
         marcas_processadas.add(nome_marca.strip())
         salvar_marcas_processadas(marcas_processadas)
+        
+async def processar_lote(playwright, indices, marcas_lista, nome_mes, modelos_processados, marcas_processadas, max_modelos, max_anos):
+    browser = await playwright.chromium.launch(headless=False)
+    context = await browser.new_context()
+    queue = Queue()
+
+    for idx in indices:
+        await queue.put(idx)
+
+    tasks = [
+        asyncio.create_task(
+            worker(queue, context, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos, nome_mes)
+            )
+        ]
+
+    await queue.join()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    await context.close()
+    await browser.close()
+
+async def processar_lote_com_contexto(context, indices, marcas_lista, nome_mes, modelos_processados, marcas_processadas, max_modelos, max_anos):
+    queue = Queue()
+
+    for idx in indices:
+        await queue.put(idx)
+
+    tasks = [
+        asyncio.create_task(
+            worker(queue, context, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos, nome_mes)
+        )
+    ]
+
+    await queue.join()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    
+# Para conseguir processar em multiplas abas o SCRAPING
+async def worker(queue, context, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos, nome_mes):
+    while not queue.empty():
+        index = await queue.get()
+        page = await context.new_page()
+        try:
+            logging.info(f"[Worker] Processando: {marcas_lista[index]} ({index})")
+            await processar_marca(page, index, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos, nome_mes)
+        except Exception as e:
+            logging.error(f"[Worker-Erro] Marca {index}: {e}")
+        finally:
+            await page.close()
+            queue.task_done()
 
 # Função principal modificada para processar 3 marcas em paralelo
-async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=1):
-    marcas_processadas = carregar_marcas_processadas()
+async def run(max_marcas=None, max_modelos=None, max_anos=None):
     modelos_processados = carregar_modelos_processados()
+    marcas_processadas = carregar_marcas_processadas()
+    meses_processados = carregar_meses_processados()
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
-        context = await browser.new_context()
+        browser_temp = await p.chromium.launch(headless=False)
+        context_temp = await browser_temp.new_context()
+        page = await context_temp.new_page()
 
         try:
-            # Abre página inicial só para pegar as marcas
-            page = await context.new_page()
-            logging.info("Acessando o site da FIPE...")
+            logging.info("Acessando a página principal para capturar meses e marcas...")
             await page.goto('https://veiculos.fipe.org.br/', timeout=120000)
-            await page.wait_for_selector('li:has-text("Carros e utilitários pequenos")', timeout=30000)
             await page.click('li:has-text("Carros e utilitários pequenos")')
-            logging.info("Selecionando Tabela de Referência...")
             await abrir_dropdown_e_esperar(page, "selectTabelaReferenciacarro_chosen")
-            await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciacarro_chosen")
+            meses_dropdown = await page.query_selector_all('div.chosen-container#selectTabelaReferenciacarro_chosen ul.chosen-results > li')
+            nomes_meses = [await m.text_content() for m in meses_dropdown]
+            nomes_meses = [m.strip() for m in nomes_meses]
 
-            logging.info("Aguardando carregamento de Marcas...")
             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
             marcas = await page.query_selector_all('div.chosen-container#selectMarcacarro_chosen ul.chosen-results > li')
             marcas_lista = [await m.text_content() for m in marcas]
             marcas_lista = [m.strip() for m in marcas_lista]
-            await page.close()
 
-            logging.warning(f"[VERIFICAÇÃO] Total de marcas mapeadas: {len(marcas_lista)}")
-            for i, nome in enumerate(marcas_lista):
-                logging.warning(f"Marca: [{i+1}]: {nome}")
-
-            max_marcas = len(marcas_lista) if max_marcas is None else min(max_marcas, len(marcas_lista))
-
-            # Fila dinâmica com as marcas
-            queue = Queue()
-            for i in range(max_marcas):
-                await queue.put(i)
-
-            # Cria os workers (navegadores paralelos)
-            tasks = [
-                asyncio.create_task(worker(queue, context, marcas_lista, modelos_processados, marcas_processadas, max_modelos, max_anos))
-                for _ in range(max_workers)
-            ]
-
-            await queue.join()  # Espera todos os workers finalizarem a fila
-            for task in tasks:
-                task.cancel()  # Cancela workers depois da fila esvaziar
-
-        except Exception as e:
-            logging.error(f"[ERRO GERAL]: {e}")
+            logging.info(f"[INFO] {len(marcas_lista)} marcas capturadas.")
         finally:
-            await browser.close()
+            await page.close()
+            await context_temp.close()
+            await browser_temp.close()
+
+        total_marcas = len(marcas_lista) if max_marcas is None else min(max_marcas, len(marcas_lista))
+        lotes = [list(range(i, total_marcas, 3)) for i in range(3)]
+
+        for nome_mes in nomes_meses:
+            if meses_processados.get(nome_mes):
+                logging.info(f"[PULANDO] Mês já processado: {nome_mes}")
+                continue
+
+            logging.info(f"\n▶ INICIANDO MÊS: {nome_mes} com 3 navegadores em sequência...")
+
+           # Cria 3 navegadores independentes com seus próprios contextos
+            browser_1 = await p.chromium.launch(headless=False)
+            browser_2 = await p.chromium.launch(headless=False)
+            browser_3 = await p.chromium.launch(headless=False)
+
+            context_1 = await browser_1.new_context()
+            context_2 = await browser_2.new_context()
+            context_3 = await browser_3.new_context()
+
+            # Roda os 3 lotes em paralelo
+            await asyncio.gather(
+                processar_lote_com_contexto(context_1, lotes[0], marcas_lista, nome_mes, modelos_processados, marcas_processadas, max_modelos, max_anos),
+                processar_lote_com_contexto(context_2, lotes[1], marcas_lista, nome_mes, modelos_processados, marcas_processadas, max_modelos, max_anos),
+                processar_lote_com_contexto(context_3, lotes[2], marcas_lista, nome_mes, modelos_processados, marcas_processadas, max_modelos, max_anos)
+            )
+
+            # Fecha os navegadores
+            await context_1.close()
+            await browser_1.close()
+            await context_2.close()
+            await browser_2.close()
+            await context_3.close()
+            await browser_3.close()
+
+            meses_processados[nome_mes] = True
+            salvar_meses_processados(meses_processados)
 
 if __name__ == "__main__":
     asyncio.run(run(max_marcas=None, max_modelos=None, max_anos=None))
