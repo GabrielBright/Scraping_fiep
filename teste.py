@@ -267,7 +267,33 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
         # Determina ponto de retomada para modelos da marca atual
         for modelo_index in range(indice_modelo_inicial, max_modelos_loop):
             try:
-                nome_modelo = (await modelos[modelo_index].text_content()).strip()
+                await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+                modelos, modelos_nomes = await obter_modelos_disponiveis(page)
+
+                # Se o dropdown não tem esse índice, espera mais e tenta de novo
+                tentativas_dropdown = 0
+                while modelo_index >= len(modelos_nomes):
+                    logging.warning(f"[AVISO] Dropdown de modelos ainda incompleto (esperado índice {modelo_index}, mas só há {len(modelos_nomes)}).")
+                    await asyncio.sleep(5)
+                    await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
+                    modelos, modelos_nomes = await obter_modelos_disponiveis(page)
+                    tentativas_dropdown += 1
+                    if tentativas_dropdown >= 3:
+                        logging.error(f"[FALHA] Dropdown de modelos não carregou corretamente após 3 tentativas. Recarregando página.")
+                        await page.reload(wait_until="domcontentloaded")
+                        await asyncio.sleep(5)
+                        try:
+                            await page.wait_for_selector('div#selectMarcacarro_chosen', timeout=15000)
+                            await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
+                            logging.info("✔ Página recarregada e dropdown de Marca disponível.")
+                        except Exception as e:
+                            logging.warning(f"[ERRO após reload] Dropdown da marca não apareceu: {e}")
+                            return
+                        await processar_marca(page, marca_index, marcas_nomes, modelos_processados, marcas_processadas, max_modelos, max_anos, nome_mes)
+                        return  # Sai dessa execução para recomeçar com a marca do zero
+
+                nome_modelo = modelos_nomes[modelo_index]
+                sucesso_todos_anos = True
                 
                 logging.info(f"  Modelo [{modelo_index+1}]: {nome_modelo}")
                 await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
@@ -282,12 +308,12 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                     await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
                     await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
                     await page.keyboard.press("Escape")
-                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=60000)
+                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=70000)
 
                     await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                     await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
                     await page.keyboard.press("Escape")
-                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=60000)
+                    await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=70000)
 
                 await abrir_dropdown_e_esperar(page, "selectAnocarro_chosen")
                 anos = await page.query_selector_all('div.chosen-container#selectAnocarro_chosen ul.chosen-results > li')
@@ -296,18 +322,18 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                 for ano_index in range(max_anos_loop):
                     try:
                         await limpar_pesquisa(page)
-                        await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=55000)
+                        await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=65000)
 
                         if ano_index > 0:
                             await abrir_dropdown_e_esperar(page, "selectMarcacarro_chosen")
                             await selecionar_item_por_index(page, "selectMarcacarro_chosen", marca_index, use_arrow=True)
                             await page.keyboard.press("Escape")
-                            await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=15000)
+                            await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=65000)
 
                             await abrir_dropdown_e_esperar(page, "selectAnoModelocarro_chosen")
                             await selecionar_item_por_index(page, "selectAnoModelocarro_chosen", modelo_index, use_arrow=True)
                             await page.keyboard.press("Escape")
-                            await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=50000)
+                            await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=55000)
 
                         nome_ano = await anos[ano_index].text_content()
                         logging.info(f"    Ano [{ano_index+1}]: {nome_ano.strip()}")
@@ -320,8 +346,8 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                         await botao_pesquisar.scroll_into_view_if_needed()
                         await botao_pesquisar.click(force=True)
 
-                        await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=50000)
-                        await page.wait_for_selector('div#resultadoConsultacarroFiltros', state='visible', timeout=50000)
+                        await page.wait_for_selector('#buttonPesquisarcarro', state='visible', timeout=55000)
+                        await page.wait_for_selector('div#resultadoConsultacarroFiltros', state='visible', timeout=55000)
 
                         codigo_fipe_elements = await page.locator('td:has-text("Código Fipe") + td p').all_text_contents()
                         preco_medio_elements = await page.locator('td:has-text("Preço Médio") + td p').all_text_contents()
@@ -381,31 +407,36 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
                             df_completo = df_completo.drop_duplicates()
                         else:
                             df_completo = fipe_temp_novo
-                        
-                        if nome_marca not in modelos_processados:
-                            modelos_processados[nome_marca] = []
-                        
-                        modelo_novo = nome_modelo not in modelos_processados[nome_marca]
-                        if modelo_novo:
-                            modelos_processados[nome_marca].append(nome_modelo)
-                            salvar_modelos_processados(modelos_processados)
 
                         df_completo.to_excel(temp, index=False)
 
                     except Exception as e:
                         logging.warning(f"[ERRO] Ano [{ano_index+1}] do Modelo [{nome_modelo.strip()}]: {e}")
-                        await asyncio.sleep(2)
+                        sucesso_todos_anos = False
+                        await asyncio.sleep(3)
+                        break
+                        
+            # Se deu tudo certo com todos os anos, grava o modelo no JSON
+                if sucesso_todos_anos:
+                    if nome_marca not in modelos_processados:
+                        modelos_processados[nome_marca] = []
+                    if nome_modelo not in modelos_processados[nome_marca]:
+                        modelos_processados[nome_marca].append(nome_modelo)
+                        salvar_modelos_processados(modelos_processados)
+                        logging.info(f"[OK] Modelo {nome_modelo} finalizado e gravado.")
+                else:
+                    logging.info(f"[RETOMAR] Modelo {nome_modelo} ficou incompleto; será reprocessado depois.")
 
             except Exception as e:
                 logging.warning(f"[ERRO] Modelo [{modelo_index+1}]: {e}")
-                await asyncio.sleep(2)
+                await asyncio.sleep(3)
                 
         # Loga que terminou a marca e quantos modelos foram processados
         logging.info(f"[CONCLUÍDO] Marca {nome_marca}: {len(modelos_processados[nome_marca])} modelos processados.")
 
     except Exception as e:
         logging.warning(f"[ERRO] Marca [{marca_index+1}]: {e}")
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
     
     finally:
         marcas_processadas.add(nome_marca.strip())
