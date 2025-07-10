@@ -1,5 +1,0 @@
-AS VEZES ESTÁ PULANDO SEM QUERER PQ ACONTECE ALGUM ERRO AO TENTAR COLETAR OS PRIMEIROS DADOS DE UM MODELOS APOS TERMINAR DE PEGAR UM 
-
-    -> Uma maneira que eu pensei de resolver isso seria a criação de uma função em que caso não consiga pegar o proximo modelo, e o erro que esta acontecendo de quando termina um modelo e vai ir para outro e vai pegar o primeiro ano modelo e da erro e pega outra marca outro modelo e outro ano mdeolo e depois de fazer isso e buscar esse modelo errado ele limpa a pesquisa e faz certo o que deveria fazer 
-    
-        -> O que eu pensei que posso fazer é criar uma Função que caso aconteça isso faça um reload na pagina e tente fazer dnv 

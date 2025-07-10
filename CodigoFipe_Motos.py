@@ -2,20 +2,24 @@ import pandas as pd
 import os
 import asyncio
 import logging
+import numpy as np
+import glob
 from playwright.async_api import async_playwright
 
 # Configura log
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Caminho para os códigos FIPE
-CODIGOS_XLSX = r"C:\Users\gabriel.vinicius\Documents\Códigos Fipe\Carros.xlsx"
+CODIGOS_XLSX = r"C:\Users\gabriel.vinicius\Documents\Códigos Fipe\Moto.xlsx"
 df_cod = pd.read_excel(CODIGOS_XLSX)
 lista_codigos = df_cod["codigoFipe"].dropna().astype(str).unique().tolist()
 MAX_ANOS = None
 
+lotes = np.array_split(lista_codigos, 2)
+
 # Função auxiliar para salvar dados
-def salvar_temp_excel(dados):
-    temp = "Fipe_temp_teste.xlsx"
+def salvar_temp_excel(dados, worker_id):
+    temp = f"Fipe_temp_teste_motos{worker_id}.xlsx"
     novo = pd.DataFrame([dados])
     if os.path.exists(temp):
         antigo = pd.read_excel(temp)
@@ -26,8 +30,8 @@ def salvar_temp_excel(dados):
 
 # Seleciona a aba de pesquisa por código
 async def selecionar_aba_pesquisa_por_codigo(page):
-    await page.click('a[data-aba="Abacarro-codigo"]')
-    await page.wait_for_selector('input[name="txtCodigoFipe"]', timeout=10000)
+    await page.click('a[data-aba="Abamoto-codigo"]')
+    await page.wait_for_selector('#selectCodigomotoCodigoFipe', timeout=10000)
 
 # Abre dropdown de ano-modelo
 async def abrir_dropdown_e_esperar(page, chosen_id):
@@ -66,10 +70,10 @@ async def selecionar_primeiro_item_teclado(page, container_id):
 async def limpar_pesquisa(page):
     try:
         # Aguarda o botão ficar visível
-        await page.wait_for_selector("#buttonLimparPesquisarcarroPorCodigoFipe", state='visible', timeout=32000)
+        await page.wait_for_selector("#buttonLimparPesquisarmotoPorCodigoFipe", state='visible', timeout=32000)
 
         # Força scroll e clica no botão
-        limpar_link = page.locator('#buttonLimparPesquisarcarroPorCodigoFipe')
+        limpar_link = page.locator('#buttonLimparPesquisarmotoPorCodigoFipe')
         await limpar_link.scroll_into_view_if_needed()
         await asyncio.sleep(0.5)
         await limpar_link.click()
@@ -89,24 +93,43 @@ async def limpar_pesquisa(page):
     except Exception as e:
         logging.warning(f"[ERRO ao tentar limpar pesquisa]: {e}")
 
-# Processa um único código FIPE
-async def extracao_dados(page, cod_fipe, max_anos=None):
-    await page.fill('input[name="txtCodigoFipe"]', cod_fipe)
-    await abrir_dropdown_e_esperar(page, "selectCodigoAnocarroCodigoFipe_chosen")
+async def run_worker(lote_codigos, worker_id):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False, slow_mo=50)
+        context = await browser.new_context()
+        page = await context.new_page()
 
-    anos = await page.query_selector_all('div#selectCodigoAnocarroCodigoFipe_chosen ul.chosen-results > li:not(.group-result)')
+        await page.goto("https://veiculos.fipe.org.br/", timeout=120000)
+        await page.click('li:has-text("Motos")')
+        await selecionar_aba_pesquisa_por_codigo(page)
+
+        for cod in lote_codigos:
+            try:
+                logging.info(f"[Worker {worker_id}] Iniciando código FIPE: {cod}")
+                await extracao_dados(page, cod, max_anos=MAX_ANOS)
+            except Exception as e:
+                logging.warning(f"[Worker {worker_id}] Falhou no código {cod}: {e}")
+                await selecionar_aba_pesquisa_por_codigo(page)
+
+        await browser.close()
+
+# Processa um único código FIPE
+async def extracao_dados(page, cod_fipe, max_anos=None, worker_id=0):
+    await page.fill('#selectCodigomotoCodigoFipe', cod_fipe)
+    await abrir_dropdown_e_esperar(page, "selectCodigoAnomotoCodigoFipe_chosen")
+
+    anos = await page.query_selector_all('div#selectCodigoAnomotoCodigoFipe_chosen ul.chosen-results > li:not(.group-result)')
     total_anos = len(anos) if max_anos is None else min(max_anos, len(anos))
     logging.info(f"[{cod_fipe}] {total_anos} ano(s) encontrados")
     
     for ano_idx in range(total_anos):
         try:
-            
-            await selecionar_item_por_index(page, "selectCodigoAnocarroCodigoFipe_chosen", ano_idx, use_arrow=True)
+            await selecionar_item_por_index(page, "selectCodigoAnomotoCodigoFipe_chosen", ano_idx, use_arrow=True)
             logging.info(f">>> Coletando ano {ano_idx+1}/{total_anos} para código {cod_fipe}")
             
             # 4. Clica em pesquisar
-            await page.click('#buttonPesquisarcarroPorCodigoFipe')
-            await page.wait_for_selector('div#resultadocarroCodigoFipe', timeout=60000)
+            await page.click('#buttonPesquisarmotoPorCodigoFipe')
+            await page.wait_for_selector('div#resultadomotoCodigoFipe', timeout=60000)
             
             tds = lambda lbl: f'td:has-text("{lbl}") + td p'
 
@@ -129,7 +152,7 @@ async def extracao_dados(page, cod_fipe, max_anos=None):
             modelo = next((x.strip() for x in modelo_elements if x.strip() and not x.strip().startswith('{')), "")
             ano_modelo = next((x.strip() for x in ano_modelo_elements if x.strip() and not x.strip().startswith('{')), "")
             
-            linhas = await page.query_selector_all('div#resultadoConsultacarroCodigoFipe tr')
+            linhas = await page.query_selector_all('div#resultadoConsultamotoCodigoFipe tr')
             dados_tabela = {}
             ultima_label = None
             
@@ -159,17 +182,23 @@ async def extracao_dados(page, cod_fipe, max_anos=None):
             }
 
             logging.info(f"[OK] {codigo_fipe} - {ano_modelo}")
-            salvar_temp_excel(dados)
+            salvar_temp_excel(dados, worker_id)
             
         except Exception as e:
             logging.warning(f"[ERRO] Falha no ano {ano_idx+1} de {cod_fipe}: {e}")
             
         # Limpa a pesquisa para o próximo ano
         await limpar_pesquisa(page)
-
-        # Preenche o código novamente
-        await page.fill('input[name="txtCodigoFipe"]', cod_fipe)
         
+        # Preenche o código novamente
+        await page.fill('#selectCodigomotoCodigoFipe', cod_fipe)
+
+async def run_paralelo():
+    tarefas = [
+        run_worker(lotes[0], worker_id=1),
+        run_worker(lotes[1], worker_id=2)
+    ]
+    await asyncio.gather(*tarefas)
 
 # Função principal para rodar a coleta
 async def run_por_codigo():
@@ -179,7 +208,7 @@ async def run_por_codigo():
         page = await context.new_page()
 
         await page.goto("https://veiculos.fipe.org.br/", timeout=120000)
-        await page.click('li:has-text("Carros e utilitários pequenos")')
+        await page.click('li:has-text("Motos")')
         await selecionar_aba_pesquisa_por_codigo(page)
 
         for cod in lista_codigos:
@@ -193,4 +222,18 @@ async def run_por_codigo():
         await browser.close()
 
 if __name__ == "__main__":
-    asyncio.run(run_por_codigo())
+    asyncio.run(run_paralelo())
+
+    arquivos = glob.glob("Fipe_temp_motos*.xlsx")  # ou "Fipe_temp_worker*.xlsx" se preferir
+    dfs = []
+    for f in arquivos:
+        try:
+            dfs.append(pd.read_excel(f))
+        except Exception as e:
+            logging.warning(f"Erro ao ler {f}: {e}")
+    if dfs:
+        final = pd.concat(dfs, ignore_index=True).drop_duplicates()
+        final.to_excel("Fipe_temp_final_motos.xlsx", index=False)
+        print(" Arquivo final salvo como Fipe_temp_final_motos.xlsx")
+    else:
+        print(" Nenhum dado foi processado para consolidar.")
