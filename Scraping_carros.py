@@ -484,7 +484,7 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None):
     meses_processados = carregar_meses_processados()
 
     async with async_playwright() as p:
-        browser_temp = await p.chromium.launch(headless=False)
+        browser_temp = await p.chromium.launch()
         context_temp = await browser_temp.new_context()
         page = await context_temp.new_page()
 
