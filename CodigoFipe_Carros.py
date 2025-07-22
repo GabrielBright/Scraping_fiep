@@ -10,7 +10,7 @@ from playwright.async_api import async_playwright
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Caminho para os códigos FIPE
-CODIGOS_XLSX = r"C:\Users\gabriel.vinicius\Documents\Códigos Fipe\Carros.xlsx"
+CODIGOS_XLSX = r"C:\Users\gabriel.vinicius\Documents\Códigos Fipe\Carros_teste.xlsx"
 df_cod = pd.read_excel(CODIGOS_XLSX)
 lista_codigos = df_cod["codigoFipe"].dropna().astype(str).unique().tolist()
 MAX_ANOS = None
@@ -19,7 +19,7 @@ lotes = np.array_split(lista_codigos, 2)
 
 # Função auxiliar para salvar dados
 def salvar_temp_excel(dados, worker_id):
-    temp = f"Fipe_temp_teste{worker_id}.xlsx"
+    temp = f"Fipe_temp_teste2{worker_id}.xlsx"
     novo = pd.DataFrame([dados])
     if os.path.exists(temp):
         antigo = pd.read_excel(temp)
@@ -31,7 +31,7 @@ def salvar_temp_excel(dados, worker_id):
 # Seleciona a aba de pesquisa por código
 async def selecionar_aba_pesquisa_por_codigo(page):
     await page.click('a[data-aba="Abacarro-codigo"]')
-    await page.wait_for_selector('input[name="txtCodigoFipe"]', timeout=10000)
+    await page.wait_for_selector('#selectCodigocarroCodigoFipe', timeout=10000)
 
 # Abre dropdown de ano-modelo
 async def abrir_dropdown_e_esperar(page, chosen_id):
@@ -115,7 +115,7 @@ async def run_worker(lote_codigos, worker_id):
 
 # Processa um único código FIPE
 async def extracao_dados(page, cod_fipe, max_anos=None, worker_id=0):
-    await page.fill('input[name="txtCodigoFipe"]', cod_fipe)
+    await page.fill('#selectCodigocarroCodigoFipe', cod_fipe)
     await abrir_dropdown_e_esperar(page, "selectCodigoAnocarroCodigoFipe_chosen")
 
     anos = await page.query_selector_all('div#selectCodigoAnocarroCodigoFipe_chosen ul.chosen-results > li:not(.group-result)')
