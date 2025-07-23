@@ -3,6 +3,7 @@ import os
 import asyncio
 import sys
 import logging
+import re
 from tqdm import tqdm
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 import json 
@@ -208,8 +209,6 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
 
         await page.wait_for_selector('li:has-text("Motos")', timeout=30000)
         await page.click('li:has-text("Motos")')
-        await abrir_dropdown_e_esperar(page, "selectTabelaReferenciamoto_chosen")
-        await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciamoto_chosen")  
         await abrir_dropdown_e_esperar(page, "selectMarcamoto_chosen")
         await selecionar_item_por_index(page, "selectMarcamoto_chosen", marca_index, use_arrow=True)
         logging.info("Aguardando carregamento de Modelos...")
@@ -267,32 +266,19 @@ async def processar_marca(page, marca_index, marcas_nomes, modelos_processados, 
 
                 await abrir_dropdown_e_esperar(page, "selectAnomoto_chosen")
                 anos = await page.query_selector_all('div.chosen-container#selectAnomoto_chosen ul.chosen-results > li')
+                anos_lista = [(idx, (await ano.text_content()).strip()) for idx, ano in enumerate(anos)]
 
-                anos_validos = []
-                for idx, ano in enumerate(anos):
-                    texto = (await ano.text_content()).strip()
-                    if texto.upper().startswith("ZERO KM"):
-                        anos_validos.append((idx, texto))
-                    else:
-                        try:
-                            ano_numerico = int(texto[:4])
-                            if ano_numerico >= 2002:
-                                anos_validos.append((idx, texto))
-                        except:
-                            continue
-
-                # Se não houver nenhum ano válido, pula o modelo
-                if not anos_validos:
-                    logging.warning(f"[SKIP] Modelo '{nome_modelo}' não possui ano-modelo válido (>=2002 ou Zero KM). Pulando...")
-                    await page.keyboard.press("Escape")  # Fecha o dropdown
+                # Se não houver nenhum ano, pula o modelo
+                if not anos_lista:
+                    logging.warning(f"[SKIP] Modelo '{nome_modelo}' não possui ano-modelo. Pulando...")
+                    await page.keyboard.press("Escape")
                     await asyncio.sleep(0.5)
                     continue
 
-                max_anos_loop = len(anos_validos) if max_anos is None else min(max_anos, len(anos_validos))
-
+                max_anos_loop = len(anos_lista) if max_anos is None else min(max_anos, len(anos_lista))
                 for ano_idx_loop in range(max_anos_loop):
-                    ano_index, nome_ano = anos_validos[ano_idx_loop]
-
+                    ano_index, nome_ano = anos_lista[ano_idx_loop]
+                    
                     try:
                         await limpar_pesquisa(page)
                         await page.wait_for_selector('#buttonPesquisarmoto', state='visible', timeout=15000)
@@ -426,8 +412,6 @@ async def run(max_marcas=None, max_modelos=None, max_anos=None, max_workers=3):
             await page.wait_for_selector('li:has-text("Motos")', timeout=30000)
             await page.click('li:has-text("Motos")')
             logging.info("Selecionando Tabela de Referência...")
-            await abrir_dropdown_e_esperar(page, "selectTabelaReferenciamoto_chosen")
-            await selecionar_primeiro_item_teclado(page, "selectTabelaReferenciamoto_chosen")
 
             logging.info("Aguardando carregamento de Marcas...")
             await abrir_dropdown_e_esperar(page, "selectMarcamoto_chosen")
